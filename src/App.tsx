@@ -15,7 +15,7 @@ import { executePythonCode } from './utils/pythonExecutor';
 import { generateCodeFromPrompt } from './services/openai';
 import { LESSONS } from './data/lessons';
 import { Lesson } from './types';
-import { Boxes, Maximize2, Minimize2, ChevronLeft, ChevronRight, Wrench, Settings, BookOpen, Code, Box, Menu, X } from 'lucide-react';
+import { Boxes, Maximize2, Minimize2, ChevronLeft, ChevronRight, Wrench, Settings, BookOpen, Code, Box, Menu, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 function App() {
   const {
@@ -52,6 +52,7 @@ function App() {
   const [lessonsPanelWidth, setLessonsPanelWidth] = useState(320);
   const [codeEditorWidth, setCodeEditorWidth] = useState(60);
   const [consoleHeight, setConsoleHeight] = useState(200);
+  const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
 
   useEffect(() => {
     // Detect mobile/tablet
@@ -551,47 +552,59 @@ function App() {
       </div>
 
       {!isFullscreen3D && !isMobile && (
-        <footer className="bg-gray-900 border-t border-gray-700 px-6 py-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
-            <div className="flex flex-col items-center md:items-start gap-1">
-              <p className="text-gray-300">© 2025 Clarence's Solutions. Educational use only.</p>
-              <p className="text-xs">Compliant with Australian Privacy Principles (APPs) & Australian Curriculum standards.</p>
-            </div>
+        <footer className="bg-gray-900 border-t border-gray-700 relative">
+          <button
+            onClick={() => setIsFooterCollapsed(!isFooterCollapsed)}
+            className="absolute -top-8 right-4 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white p-2 rounded-t-lg transition-colors shadow-lg"
+            title={isFooterCollapsed ? "Show footer" : "Hide footer"}
+          >
+            {isFooterCollapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
 
-            <div className="flex flex-wrap items-center justify-center gap-4">
-              <button
-                onClick={() => setShowPrivacyModal(true)}
-                className="hover:text-blue-400 transition-colors"
-              >
-                Privacy Policy
-              </button>
-              <span className="text-gray-600">|</span>
-              <button
-                onClick={() => setShowTermsModal(true)}
-                className="hover:text-blue-400 transition-colors"
-              >
-                Terms of Use
-              </button>
-              <span className="text-gray-600">|</span>
-              <a
-                href="https://clarence.guru/#contact"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-blue-400 transition-colors"
-              >
-                Contact
-              </a>
-              <span className="text-gray-600">|</span>
-              <a
-                href="https://www.australiancurriculum.edu.au/f-10-curriculum/technologies/digital-technologies/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-blue-400 transition-colors"
-              >
-                Australian Curriculum
-              </a>
+          {!isFooterCollapsed && (
+            <div className="px-6 py-4">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
+                <div className="flex flex-col items-center md:items-start gap-1">
+                  <p className="text-gray-300">© 2025 Clarence's Solutions. Educational use only. <span className="text-gray-400">| ABN 24 536 830 970</span></p>
+                  <p className="text-xs">Compliant with Australian Privacy Principles (APPs) & Australian Curriculum standards.</p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                  <button
+                    onClick={() => setShowPrivacyModal(true)}
+                    className="hover:text-blue-400 transition-colors"
+                  >
+                    Privacy Policy
+                  </button>
+                  <span className="text-gray-600">|</span>
+                  <button
+                    onClick={() => setShowTermsModal(true)}
+                    className="hover:text-blue-400 transition-colors"
+                  >
+                    Terms of Use
+                  </button>
+                  <span className="text-gray-600">|</span>
+                  <a
+                    href="https://clarence.guru/#contact"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-blue-400 transition-colors"
+                  >
+                    Contact
+                  </a>
+                  <span className="text-gray-600">|</span>
+                  <a
+                    href="https://www.australiancurriculum.edu.au/f-10-curriculum/technologies/digital-technologies/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-blue-400 transition-colors"
+                  >
+                    Australian Curriculum
+                  </a>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </footer>
       )}
     </div>
