@@ -1,6 +1,6 @@
 # CodeCraft - Python Learning Platform
 
-CodeCraft is an interactive web-based platform that teaches Python programming through 3D block building. Learn coding concepts by creating structures in a Minecraft-style voxel world!
+CodeCraft is an interactive web-based platform that teaches Python programming through 3D block building. Learn coding concepts by creating structures in a Minecraft-style voxel world! Export your creations as STL files for 3D printing or use in animation projects.
 
 ## Features
 
@@ -23,6 +23,7 @@ CodeCraft is an interactive web-based platform that teaches Python programming t
   - Scroll to zoom
   - WASD keys to move
 - Real-time block placement as code runs
+- Export to STL format for 3D printing and animation
 
 ### 🎨 Materials System
 - 88 block types with unique colors and textures

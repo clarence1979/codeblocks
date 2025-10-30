@@ -25,7 +25,8 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
           <div>
             <p className="text-gray-300 text-lg leading-relaxed">
               Learn Python programming by building amazing 3D structures! Code Blocks combines coding education
-              with interactive block building to make learning fun and visual.
+              with interactive block building to make learning fun and visual. Export your creations as STL files
+              for 3D printing or animation projects.
             </p>
           </div>
 
@@ -46,7 +47,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
                 <h3 className="font-semibold text-white">3D World</h3>
               </div>
               <p className="text-sm text-gray-400">
-                Watch your code come to life! Drag to rotate, scroll to zoom, and use WASD to move around.
+                Watch your code come to life! Drag to rotate, scroll to zoom, and use WASD to move around. Export as STL for 3D printing.
               </p>
             </div>
           </div>

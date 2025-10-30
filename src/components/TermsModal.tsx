@@ -23,7 +23,7 @@ export function TermsModal({ onClose }: TermsModalProps) {
 
           <section>
             <h3 className="text-xl font-semibold text-white mb-3">Educational Purpose</h3>
-            <p>Code Blocks is an educational tool designed to teach Python programming and computational thinking through interactive 3D visualization. It is suitable for use in Australian schools and educational institutions.</p>
+            <p>Code Blocks is an educational tool designed to teach Python programming and computational thinking through interactive 3D visualization. It is suitable for use in Australian schools and educational institutions. Users can export their creations as STL files for 3D printing or use in animation projects.</p>
           </section>
 
           <section>
