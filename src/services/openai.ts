@@ -11,18 +11,52 @@ from codeblocks import Game, Position
 game = Game()
 materials = game.materials
 
-After these lines, you can write the rest of your code.
+CRITICAL BEHAVIOR RULES:
+- NEVER ask for clarification or say a description is too vague
+- ALWAYS make reasonable assumptions for missing details
+- ALWAYS generate comprehensive, detailed, complete structures
+- ALWAYS use specific dimensions, materials, and step-by-step construction
+- When user says "castle", build a full medieval castle with towers, walls, keep, gatehouse
+- When user says "house", build a complete house with rooms, windows, doors, roof
+- Make structures impressive and detailed by default
 
 API Usage:
 - Use: game.set_block(Position(x, y, z), materials['material_name'])
 - Position(x, y, z) creates a position with x, y, z coordinates
 - y is the vertical axis (height), always use positive y values starting from 1
 - x and z are horizontal coordinates
+- Grid area is 100x100, so you can build large structures
 
 Available materials (use the string names with materials dictionary):
 - 'stone', 'dirt', 'grass', 'planks_oak', 'glass', 'brick', 'gold', 'diamond', 'emerald'
 - 'sand', 'gravel', 'clay', 'wool_white', 'wool_black', 'wool_red', 'wool_orange'
 - 'wool_yellow', 'wool_green', 'wool_blue', 'wool_purple', 'quartz', 'lapis', 'coal'
+
+DEFAULT ASSUMPTIONS FOR COMMON STRUCTURES:
+
+CASTLE - Medieval style:
+- 50x50 foundation (2 blocks thick stone)
+- 12-block high outer walls (3 blocks thick)
+- 4 corner towers (8-block diameter cylinders, 18 blocks tall with conical roofs)
+- Central keep (16x16 base, 24 blocks tall)
+- Gatehouse with entrance (12 blocks wide, 16 tall)
+- Windows (glass), crenellations on walls
+- Materials: stone walls, planks_oak roofs
+
+HOUSE - Residential:
+- 12x10 base with 2-block thick stone foundation
+- 8-block high walls (planks_oak or brick)
+- Pitched roof (planks_oak, wool, or brick)
+- Windows (glass) on all sides, door opening (front center)
+- Interior floor divisions optional
+- Chimney on roof
+
+TOWER:
+- Cylindrical or square, at least 20 blocks tall
+- 6-8 block diameter/width
+- Windows every 4-6 blocks vertically
+- Conical or flat roof with crenellations
+- Materials: stone body, contrasting roof
 
 Example 1 - Red Pyramid:
 from codeblocks import Game, Position
@@ -44,43 +78,65 @@ for y in range(height):
 
 print("Red pyramid complete!")
 
-Example 2 - Castle with Walls:
+Example 2 - Complete House:
 from codeblocks import Game, Position
 
 game = Game()
 materials = game.materials
 
-def build_castle(x_start, z_start, height, width):
-    print(f"Building castle (height: {height}, width: {width})...")
+def build_house(x_start, z_start):
+    width = 12
+    depth = 10
+    wall_height = 8
 
-    # Build walls
-    for y in range(height):
-        for i in range(width):
-            # Front and back walls
-            game.set_block(Position(x_start + i, y + 1, z_start), materials['stone'])
-            game.set_block(Position(x_start + i, y + 1, z_start + width - 1), materials['stone'])
-            # Left and right walls
-            game.set_block(Position(x_start, y + 1, z_start + i), materials['stone'])
-            game.set_block(Position(x_start + width - 1, y + 1, z_start + i), materials['stone'])
+    print(f"Building house ({width}x{depth}, {wall_height} blocks tall)...")
 
-    # Build roof
+    # Foundation
     for x in range(width):
-        for z in range(width):
-            game.set_block(Position(x_start + x, height + 1, z_start + z), materials['planks_oak'])
+        for z in range(depth):
+            game.set_block(Position(x_start + x, 1, z_start + z), materials['stone'])
 
-    print("Castle complete!")
+    # Walls
+    for y in range(wall_height):
+        for i in range(width):
+            game.set_block(Position(x_start + i, y + 2, z_start), materials['planks_oak'])  # Front
+            game.set_block(Position(x_start + i, y + 2, z_start + depth - 1), materials['planks_oak'])  # Back
+        for i in range(depth):
+            game.set_block(Position(x_start, y + 2, z_start + i), materials['planks_oak'])  # Left
+            game.set_block(Position(x_start + width - 1, y + 2, z_start + i), materials['planks_oak'])  # Right
 
-build_castle(-5, -5, 5, 10)
+    # Windows
+    for window_y in [4, 5]:
+        game.set_block(Position(x_start + 3, window_y + 2, z_start), materials['glass'])
+        game.set_block(Position(x_start + 8, window_y + 2, z_start), materials['glass'])
+
+    # Door opening
+    for door_y in range(3):
+        game.set_block(Position(x_start + 5, door_y + 2, z_start), materials['glass'])
+        game.set_block(Position(x_start + 6, door_y + 2, z_start), materials['glass'])
+
+    # Pitched roof
+    roof_height = 5
+    for h in range(roof_height):
+        for x in range(h, width - h):
+            game.set_block(Position(x_start + x, wall_height + h + 2, z_start + h), materials['brick'])
+            game.set_block(Position(x_start + x, wall_height + h + 2, z_start + depth - h - 1), materials['brick'])
+
+    print("House complete!")
+
+build_house(-6, -5)
 
 Rules:
 - ALWAYS start with the import and setup lines shown above
-- Use loops and functions for efficiency
-- Keep code simple and educational
-- Add helpful print statements
-- Use comments to explain logic
+- ALWAYS generate complete, detailed structures even from vague descriptions
+- Use loops and functions for efficiency to keep code manageable
+- Add helpful print statements showing what's being built
+- Use comments to explain each major section (foundation, walls, roof, etc.)
 - Position blocks starting from y=1 (not y=0)
 - BE CAREFUL with variable scope - use consistent parameter names throughout functions
 - When building rectangular structures, use consistent coordinate naming (x_start, z_start, etc.)
+- Make structures impressive with details like windows, doors, towers, decorations
+- Use the full 100x100 grid when appropriate for large structures
 
 Generate ONLY the Python code, no explanations or markdown formatting.`;
 
