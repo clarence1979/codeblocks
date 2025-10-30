@@ -48,7 +48,7 @@ export function Scene3D({ blocks, blockCount }: Scene3DProps) {
     directionalLight.position.set(10, 20, 10);
     scene.add(directionalLight);
 
-    const gridSize = 50;
+    const gridSize = 100;
     const gridHelper = new THREE.GridHelper(gridSize, gridSize, 0x444444, 0x222222);
     scene.add(gridHelper);
 
