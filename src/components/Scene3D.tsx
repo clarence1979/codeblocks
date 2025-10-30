@@ -286,7 +286,7 @@ export function Scene3D({ blocks, blockCount }: Scene3DProps) {
 
       <button
         onClick={() => downloadSTL(blocks)}
-        className="absolute top-4 right-4 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2 group"
+        className="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2 group"
         title="Export as STL for 3D printing"
       >
         <Download size={20} />
