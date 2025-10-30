@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { Download } from 'lucide-react';
 import { Block } from '../types';
 import { MATERIAL_COLORS } from '../data/materials';
+import { downloadSTL } from '../utils/stlExporter';
 
 interface Scene3DProps {
   blocks: Block[];
@@ -281,6 +283,15 @@ export function Scene3D({ blocks, blockCount }: Scene3DProps) {
         <div>Camera: ({cameraPosRef.current.x.toFixed(1)}, {cameraPosRef.current.y.toFixed(1)}, {cameraPosRef.current.z.toFixed(1)})</div>
         <div>Blocks: {blockCount}</div>
       </div>
+
+      <button
+        onClick={() => downloadSTL(blocks)}
+        className="absolute top-4 right-4 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2 group"
+        title="Export as STL for 3D printing"
+      >
+        <Download size={20} />
+        <span className="text-sm font-medium">Export STL</span>
+      </button>
 
       <div className="absolute bottom-4 left-4 bg-gray-900/90 text-white px-4 py-2 rounded text-xs">
         <div className="font-semibold mb-1">Controls:</div>
