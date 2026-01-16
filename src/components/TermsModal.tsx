@@ -87,7 +87,7 @@ export function TermsModal({ onClose }: TermsModalProps) {
 
           <section>
             <h3 className="text-xl font-semibold text-white mb-3">Intellectual Property</h3>
-            <p>Code Blocks is provided as free educational software. Users retain ownership of any code they create using the application. The application itself and its original content remain the property of Clarence's Solutions.</p>
+            <p>Code Blocks is provided as free educational software. Users retain ownership of any code they create using the application. The application itself and its original content remain the property of Digital Vector.</p>
           </section>
 
           <section>
@@ -109,8 +109,8 @@ export function TermsModal({ onClose }: TermsModalProps) {
             <h3 className="text-xl font-semibold text-white mb-3">Contact</h3>
             <p>For questions, support, or concerns regarding these terms:</p>
             <p className="mt-2">
-              <a href="https://clarence.guru/#contact" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                Contact Clarence's Solutions
+              <a href="https://digitalvector.com.au" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                Contact Digital Vector
               </a>
             </p>
           </section>

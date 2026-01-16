@@ -67,8 +67,8 @@ export function PrivacyModal({ onClose }: PrivacyModalProps) {
             <h3 className="text-xl font-semibold text-white mb-3">7. Contact Information</h3>
             <p>For privacy-related questions or concerns, please contact:</p>
             <p className="mt-2">
-              <a href="https://clarence.guru/#contact" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                Clarence's Solutions
+              <a href="https://digitalvector.com.au" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                Digital Vector
               </a>
             </p>
           </section>

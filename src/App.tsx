@@ -287,16 +287,16 @@ function App() {
                   />
                 </form>
                 <a
-                  href="https://clarence.guru/#contact"
+                  href="https://digitalvector.com.au"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:opacity-80 transition-opacity"
-                  title="Contact Clarence's Solutions"
+                  title="Digital Vector"
                 >
                   <img
-                    src="/cla sol.png"
-                    alt="Clarence's Solutions"
-                    className="h-10 w-auto"
+                    src="/digivec_logo.png"
+                    alt="Digital Vector"
+                    className="h-16 w-auto"
                   />
                 </a>
                 <a
@@ -565,7 +565,7 @@ function App() {
             <div className="px-6 py-4">
               <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
                 <div className="flex flex-col items-center md:items-start gap-1">
-                  <p className="text-gray-300">© 2025 Clarence's Solutions. Educational use only. <span className="text-gray-400">| ABN 24 536 830 970</span></p>
+                  <p className="text-gray-300">© 2025 Digital Vector. Educational use only.</p>
                   <p className="text-xs">Compliant with Australian Privacy Principles (APPs) & Australian Curriculum standards.</p>
                 </div>
 
