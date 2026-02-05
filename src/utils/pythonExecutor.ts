@@ -25,6 +25,30 @@ export async function executePythonCode(
   try {
     const pyodide = await initializePyodide();
 
+    // Track blocks placed during this execution for immediate collision detection
+    const placedBlocksThisExecution = new Set<string>();
+
+    // Wrapper for block placement that tracks placements
+    const trackingBlockCallback = (x: number, y: number, z: number, material: number) => {
+      const key = `${x},${y},${z}`;
+      placedBlocksThisExecution.add(key);
+      onBlockPlaced(x, y, z, material);
+    };
+
+    // Enhanced position check that includes currently-being-placed blocks
+    const enhancedPositionCheck = (x: number, y: number, z: number): boolean => {
+      const key = `${x},${y},${z}`;
+      // Check if block was just placed in this execution
+      if (placedBlocksThisExecution.has(key)) {
+        return true;
+      }
+      // Check existing blocks in store
+      if (isPositionOccupied) {
+        return isPositionOccupied(x, y, z);
+      }
+      return false;
+    };
+
     const codeCraftModule = `
 import sys
 from types import ModuleType
@@ -52,10 +76,19 @@ class Game:
         self._console_callback = _global_console_callback
         self._clear_callback = _global_clear_callback
         self._position_check_callback = _global_position_check_callback
+        self.collision_detection_enabled = True
 
     def set_block(self, position, material):
+        # Check for collision before placing
+        if self.collision_detection_enabled and self._position_check_callback:
+            if self._position_check_callback(position.x, position.y, position.z):
+                # Position is occupied, don't place block
+                return False
+
         if self._block_callback:
             self._block_callback(position.x, position.y, position.z, material)
+            return True
+        return False
 
     def is_position_occupied(self, position):
         """Check if a position is already occupied by a block"""
@@ -66,6 +99,14 @@ class Game:
     def can_place_block(self, position):
         """Check if a block can be placed at this position (opposite of is_position_occupied)"""
         return not self.is_position_occupied(position)
+
+    def disable_collision_detection(self):
+        """Disable collision detection to allow overwriting blocks"""
+        self.collision_detection_enabled = False
+
+    def enable_collision_detection(self):
+        """Enable collision detection to prevent overwriting blocks"""
+        self.collision_detection_enabled = True
 
     def clear_console(self):
         if self._clear_callback:
@@ -92,10 +133,10 @@ sys.modules['codecraft'] = codeblocks
 
     await pyodide.runPythonAsync(codeCraftModule);
 
-    pyodide.globals.set('js_block_callback', onBlockPlaced);
+    pyodide.globals.set('js_block_callback', trackingBlockCallback);
     pyodide.globals.set('js_console_callback', onConsoleOutput);
     pyodide.globals.set('js_clear_callback', onConsoleClear);
-    pyodide.globals.set('js_position_check_callback', isPositionOccupied || (() => false));
+    pyodide.globals.set('js_position_check_callback', enhancedPositionCheck);
 
     const setupCallbacks = `
 _set_global_callbacks(js_block_callback, js_console_callback, js_clear_callback, js_position_check_callback)

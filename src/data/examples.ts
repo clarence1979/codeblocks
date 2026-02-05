@@ -194,35 +194,45 @@ materials = game.materials
 print("Collision Detection Demo")
 print("=" * 40)
 
-# Place initial blocks
-for x in range(3):
-    game.set_block(Position(x, 1, -10), materials['brick'])
-print("Placed 3 brick blocks at y=1")
+# Place a base layer of brick blocks
+print("\\nPlacing base layer (brick)...")
+for x in range(5):
+    for z in range(-12, -8):
+        game.set_block(Position(x, 1, z), materials['brick'])
+print("Base layer complete!")
 
-# Try to place blocks at same positions
-print("\\nAttempting to place blocks at occupied positions...")
-placed_count = 0
-skipped_count = 0
+# Try to place blocks at same positions (should be blocked)
+print("\\nAttempting to place gold blocks at occupied positions...")
+placed = 0
+for x in range(5):
+    for z in range(-12, -8):
+        result = game.set_block(Position(x, 1, z), materials['gold'])
+        if result:
+            placed += 1
 
-for x in range(3):
-    pos = Position(x, 1, -10)
-    if game.is_position_occupied(pos):
-        print(f"  Position ({x}, 1, -10) is occupied - skipped")
-        skipped_count += 1
-    else:
-        game.set_block(pos, materials['gold'])
-        placed_count += 1
+print(f"Attempted: 20 blocks, Placed: {placed} (collision detection working!)")
 
-print(f"\\nPlaced: {placed_count} blocks")
-print(f"Skipped: {skipped_count} blocks (collision detected)")
+# Place a second layer above (should work)
+print("\\nPlacing second layer above (gold)...")
+placed2 = 0
+for x in range(5):
+    for z in range(-12, -8):
+        result = game.set_block(Position(x, 2, z), materials['gold'])
+        if result:
+            placed2 += 1
 
-# Place blocks at empty positions
-print("\\nPlacing blocks at empty positions...")
-for x in range(3):
-    pos = Position(x, 2, -10)
-    if game.can_place_block(pos):
-        game.set_block(pos, materials['gold'])
-        print(f"  Placed gold block at ({x}, 2, -10)")
+print(f"Second layer: {placed2} blocks placed")
+
+# Test with set_block return value
+print("\\nTesting set_block return value...")
+pos1 = Position(2, 1, -10)
+pos2 = Position(2, 3, -10)
+
+result1 = game.set_block(pos1, materials['diamond'])
+result2 = game.set_block(pos2, materials['emerald'])
+
+print(f"Placing at occupied (2,1,-10): {result1}")
+print(f"Placing at empty (2,3,-10): {result2}")
 
 print("\\nDemo complete!")
 `
