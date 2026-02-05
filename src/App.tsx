@@ -54,6 +54,7 @@ function App() {
   const [codeEditorWidth, setCodeEditorWidth] = useState(60);
   const [consoleHeight, setConsoleHeight] = useState(200);
   const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
+  const [autoOffsetEnabled, setAutoOffsetEnabled] = useState(true);
 
   useEffect(() => {
     // Detect mobile/tablet
@@ -158,6 +159,16 @@ function App() {
     clearConsole();
     addConsoleOutput('Running code...');
 
+    // Calculate offset to avoid overlapping with existing structures
+    let offset = { x: 0, y: 0, z: 0 };
+    if (autoOffsetEnabled && blocks.length > 0) {
+      // Find the maximum X coordinate of existing blocks
+      const maxX = Math.max(...blocks.map(b => b.position.x));
+      // Place new structure 15 units to the right
+      offset.x = maxX + 15;
+      addConsoleOutput(`Placing new structure at offset X=${offset.x} to avoid overlaps`);
+    }
+
     try {
       await executePythonCode(
         codeToRun,
@@ -170,9 +181,15 @@ function App() {
         () => {
           clearConsole();
         },
-        isPositionOccupied
+        isPositionOccupied,
+        offset
       );
       addConsoleOutput('Code execution complete!');
+
+      // Re-enable auto-offset after successful run
+      if (!autoOffsetEnabled) {
+        setAutoOffsetEnabled(true);
+      }
     } catch (error) {
       if (error instanceof Error) {
         addConsoleOutput(`Error: ${error.message}`);
@@ -185,17 +202,23 @@ function App() {
   const handleClearWorld = () => {
     clearBlocks();
     clearConsole();
+    setAutoOffsetEnabled(false);
     addConsoleOutput('World cleared!');
   };
 
   const handleSelectLesson = (lesson: Lesson) => {
     setCurrentLesson(lesson.id);
-    handleClearWorld();
+    clearBlocks();
+    clearConsole();
+    setAutoOffsetEnabled(false);
+    addConsoleOutput('World cleared!');
   };
 
   const handleLoadExample = (exampleCode: string) => {
     setCode(exampleCode);
-    handleClearWorld();
+    clearBlocks();
+    clearConsole();
+    setAutoOffsetEnabled(false);
     addConsoleOutput('Example loaded! Click "Run Code" to execute.');
   };
 

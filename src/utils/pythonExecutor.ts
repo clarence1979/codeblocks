@@ -20,7 +20,8 @@ export async function executePythonCode(
   onBlockPlaced: (x: number, y: number, z: number, material: number) => void,
   onConsoleOutput: (message: string) => void,
   onConsoleClear: () => void,
-  isPositionOccupied?: (x: number, y: number, z: number) => boolean
+  isPositionOccupied?: (x: number, y: number, z: number) => boolean,
+  offset?: { x: number; y: number; z: number }
 ): Promise<void> {
   try {
     const pyodide = await initializePyodide();
@@ -49,6 +50,10 @@ export async function executePythonCode(
       return false;
     };
 
+    const offsetX = offset?.x || 0;
+    const offsetY = offset?.y || 0;
+    const offsetZ = offset?.z || 0;
+
     const codeCraftModule = `
 import sys
 from types import ModuleType
@@ -58,12 +63,13 @@ _global_block_callback = None
 _global_console_callback = None
 _global_clear_callback = None
 _global_position_check_callback = None
+_global_offset = (${offsetX}, ${offsetY}, ${offsetZ})
 
 class Position:
     def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
+        self.x = x + _global_offset[0]
+        self.y = y + _global_offset[1]
+        self.z = z + _global_offset[2]
 
     def __repr__(self):
         return f"Position(x={self.x}, y={self.y}, z={self.z})"
