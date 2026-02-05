@@ -27,10 +27,19 @@ API Usage:
 - x and z are horizontal coordinates
 - Grid area is 100x100, so you can build large structures
 
-Available materials (use the string names with materials dictionary):
-- 'stone', 'dirt', 'grass', 'planks_oak', 'glass', 'brick', 'gold', 'diamond', 'emerald'
-- 'sand', 'gravel', 'clay', 'wool_white', 'wool_black', 'wool_red', 'wool_orange'
-- 'wool_yellow', 'wool_green', 'wool_blue', 'wool_purple', 'quartz', 'lapis', 'coal'
+Available materials (ONLY use these exact names with materials dictionary):
+- Basic blocks: 'stone', 'cobblestone', 'mossy_cobblestone', 'dirt', 'grass', 'sand', 'gravel'
+- Wood: 'planks_oak', 'wood', 'bookshelf', 'leaves'
+- Glass & transparent: 'glass', 'ice', 'packed_ice', 'water'
+- Stone variants: 'brick', 'obsidian', 'quartz', 'terracotta', 'prismarine', 'end_stone', 'purpur'
+- Ores & metals: 'diamond', 'emerald', 'gold', 'iron', 'copper', 'lapis', 'coal', 'redstone'
+- Wool colors: 'wool_white', 'wool_black', 'wool_red', 'wool_orange', 'wool_yellow', 'wool_green', 'wool_blue', 'wool_purple', 'wool_pink', 'wool_cyan', 'wool_brown', 'wool_lime', 'wool_gray', 'wool_light_gray'
+- Concrete colors: 'concrete_white', 'concrete_black', 'concrete_red', 'concrete_orange', 'concrete_yellow', 'concrete_green', 'concrete_blue', 'concrete_purple', 'concrete_pink', 'concrete_cyan', 'concrete_brown', 'concrete_lime', 'concrete_gray', 'concrete_light_blue', 'concrete_magenta'
+- Terracotta colors: 'terracotta_white', 'terracotta_black', 'terracotta_red', 'terracotta_orange', 'terracotta_yellow', 'terracotta_green', 'terracotta_blue', 'terracotta_purple', 'terracotta_pink', 'terracotta_cyan', 'terracotta_brown', 'terracotta_lime', 'terracotta_gray', 'terracotta_light_blue', 'terracotta_magenta'
+- Decorative: 'linen_red', 'linen_blue', 'box_red', 'box_blue', 'box_lime', 'glazed_terracotta_cyan', 'glazed_terracotta_purple', 'shulker_box'
+- Special: 'tnt', 'glowstone', 'sea_lantern', 'magma', 'netherrack', 'soul_sand', 'nether_brick'
+
+CRITICAL: DO NOT use materials that are not in this list (e.g., NO 'steel', 'silver', 'bronze', etc.). Use 'iron' for metallic structures.
 
 DEFAULT ASSUMPTIONS FOR COMMON STRUCTURES:
 
@@ -57,6 +66,19 @@ TOWER:
 - Windows every 4-6 blocks vertically
 - Conical or flat roof with crenellations
 - Materials: stone body, contrasting roof
+
+ROCKET/SPACESHIP:
+- Use 'iron' for metallic body (NOT steel!)
+- Use 'concrete_white' or 'quartz' for hull panels
+- Use 'glass' for cockpit windows
+- Use 'redstone' or 'wool_red' for engine exhaust
+- Use 'gold' or 'concrete_yellow' for trim details
+
+MODERN BUILDING:
+- Use 'concrete_white', 'concrete_gray', or 'concrete_black' for walls
+- Use 'glass' extensively for windows
+- Use 'iron' for structural beams (NOT steel!)
+- Use 'quartz' for clean white surfaces
 
 Example 1 - Red Pyramid:
 from codeblocks import Game, Position
