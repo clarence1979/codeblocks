@@ -150,6 +150,14 @@ materials = game.materials             # Get materials dictionary
 # Place a block
 game.set_block(Position(x, y, z), materials['material_name'])
 
+# Check if position is occupied (collision detection)
+if game.is_position_occupied(Position(x, y, z)):
+    print("Position is occupied!")
+
+# Check if block can be placed
+if game.can_place_block(Position(x, y, z)):
+    game.set_block(Position(x, y, z), materials['material_name'])
+
 # Print to console
 print("Your message here")
 ```
@@ -199,6 +207,57 @@ for x in range(size):
     for y in range(1, size + 1):
         for z in range(size):
             game.set_block(Position(x, y, z), material)
+```
+
+## 🛡️ Collision Detection
+
+Collision detection prevents blocks from being placed at positions that are already occupied.
+
+**Check if position is occupied:**
+```python
+pos = Position(0, 1, -10)
+if game.is_position_occupied(pos):
+    print("Position is occupied!")
+else:
+    print("Position is free!")
+```
+
+**Check before placing:**
+```python
+# Only place if position is free
+if game.can_place_block(Position(x, y, z)):
+    game.set_block(Position(x, y, z), materials['diamond'])
+    print("Block placed successfully")
+else:
+    print("Cannot place block - position occupied")
+```
+
+**Skip occupied positions in loops:**
+```python
+# Place blocks only in free positions
+for x in range(10):
+    pos = Position(x, 1, -10)
+    if game.can_place_block(pos):
+        game.set_block(pos, materials['gold'])
+        print(f"Placed block at x={x}")
+    else:
+        print(f"Skipped occupied position at x={x}")
+```
+
+**Count collisions:**
+```python
+placed = 0
+skipped = 0
+
+for x in range(10):
+    pos = Position(x, 1, -10)
+    if game.is_position_occupied(pos):
+        skipped += 1
+    else:
+        game.set_block(pos, materials['brick'])
+        placed += 1
+
+print(f"Placed: {placed}, Skipped: {skipped}")
 ```
 
 ## 🎨 Popular Materials

@@ -33,7 +33,8 @@ function App() {
     setIsRunning,
     setCurrentLesson,
     setShowWelcomeModal,
-    setIsFullscreen3D
+    setIsFullscreen3D,
+    isPositionOccupied
   } = useCodeCraftStore();
 
   const [code, setCode] = useState('');
@@ -168,7 +169,8 @@ function App() {
         },
         () => {
           clearConsole();
-        }
+        },
+        isPositionOccupied
       );
       addConsoleOutput('Code execution complete!');
     } catch (error) {

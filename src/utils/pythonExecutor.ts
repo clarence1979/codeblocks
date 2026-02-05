@@ -19,7 +19,8 @@ export async function executePythonCode(
   code: string,
   onBlockPlaced: (x: number, y: number, z: number, material: number) => void,
   onConsoleOutput: (message: string) => void,
-  onConsoleClear: () => void
+  onConsoleClear: () => void,
+  isPositionOccupied?: (x: number, y: number, z: number) => boolean
 ): Promise<void> {
   try {
     const pyodide = await initializePyodide();
@@ -32,6 +33,7 @@ from types import ModuleType
 _global_block_callback = None
 _global_console_callback = None
 _global_clear_callback = None
+_global_position_check_callback = None
 
 class Position:
     def __init__(self, x, y, z):
@@ -49,20 +51,32 @@ class Game:
         self._block_callback = _global_block_callback
         self._console_callback = _global_console_callback
         self._clear_callback = _global_clear_callback
+        self._position_check_callback = _global_position_check_callback
 
     def set_block(self, position, material):
         if self._block_callback:
             self._block_callback(position.x, position.y, position.z, material)
 
+    def is_position_occupied(self, position):
+        """Check if a position is already occupied by a block"""
+        if self._position_check_callback:
+            return self._position_check_callback(position.x, position.y, position.z)
+        return False
+
+    def can_place_block(self, position):
+        """Check if a block can be placed at this position (opposite of is_position_occupied)"""
+        return not self.is_position_occupied(position)
+
     def clear_console(self):
         if self._clear_callback:
             self._clear_callback()
 
-def _set_global_callbacks(block_cb, console_cb, clear_cb):
-    global _global_block_callback, _global_console_callback, _global_clear_callback
+def _set_global_callbacks(block_cb, console_cb, clear_cb, position_check_cb):
+    global _global_block_callback, _global_console_callback, _global_clear_callback, _global_position_check_callback
     _global_block_callback = block_cb
     _global_console_callback = console_cb
     _global_clear_callback = clear_cb
+    _global_position_check_callback = position_check_cb
 
 # Create codeblocks module
 codeblocks = ModuleType('codeblocks')
@@ -81,9 +95,10 @@ sys.modules['codecraft'] = codeblocks
     pyodide.globals.set('js_block_callback', onBlockPlaced);
     pyodide.globals.set('js_console_callback', onConsoleOutput);
     pyodide.globals.set('js_clear_callback', onConsoleClear);
+    pyodide.globals.set('js_position_check_callback', isPositionOccupied || (() => false));
 
     const setupCallbacks = `
-_set_global_callbacks(js_block_callback, js_console_callback, js_clear_callback)
+_set_global_callbacks(js_block_callback, js_console_callback, js_clear_callback, js_position_check_callback)
 `;
     await pyodide.runPythonAsync(setupCallbacks);
 

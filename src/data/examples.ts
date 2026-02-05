@@ -182,5 +182,49 @@ for i in range(50):
 
 print("Random art complete!")
 `
+  },
+  {
+    id: 'collision-detection',
+    title: 'Collision Detection Demo',
+    code: `from codeblocks import Game, Position
+
+game = Game()
+materials = game.materials
+
+print("Collision Detection Demo")
+print("=" * 40)
+
+# Place initial blocks
+for x in range(3):
+    game.set_block(Position(x, 1, -10), materials['brick'])
+print("Placed 3 brick blocks at y=1")
+
+# Try to place blocks at same positions
+print("\\nAttempting to place blocks at occupied positions...")
+placed_count = 0
+skipped_count = 0
+
+for x in range(3):
+    pos = Position(x, 1, -10)
+    if game.is_position_occupied(pos):
+        print(f"  Position ({x}, 1, -10) is occupied - skipped")
+        skipped_count += 1
+    else:
+        game.set_block(pos, materials['gold'])
+        placed_count += 1
+
+print(f"\\nPlaced: {placed_count} blocks")
+print(f"Skipped: {skipped_count} blocks (collision detected)")
+
+# Place blocks at empty positions
+print("\\nPlacing blocks at empty positions...")
+for x in range(3):
+    pos = Position(x, 2, -10)
+    if game.can_place_block(pos):
+        game.set_block(pos, materials['gold'])
+        print(f"  Placed gold block at ({x}, 2, -10)")
+
+print("\\nDemo complete!")
+`
   }
 ];

@@ -9,6 +9,7 @@ interface CodeCraftStore {
   showWelcomeModal: boolean;
   blockCount: number;
   isFullscreen3D: boolean;
+  collisionDetectionEnabled: boolean;
 
   addBlock: (block: Block) => void;
   clearBlocks: () => void;
@@ -18,9 +19,11 @@ interface CodeCraftStore {
   setCurrentLesson: (lessonId: number) => void;
   setShowWelcomeModal: (show: boolean) => void;
   setIsFullscreen3D: (fullscreen: boolean) => void;
+  setCollisionDetectionEnabled: (enabled: boolean) => void;
+  isPositionOccupied: (x: number, y: number, z: number) => boolean;
 }
 
-export const useCodeCraftStore = create<CodeCraftStore>((set) => ({
+export const useCodeCraftStore = create<CodeCraftStore>((set, get) => ({
   blocks: [],
   consoleOutput: [],
   isRunning: false,
@@ -28,6 +31,7 @@ export const useCodeCraftStore = create<CodeCraftStore>((set) => ({
   showWelcomeModal: true,
   blockCount: 0,
   isFullscreen3D: false,
+  collisionDetectionEnabled: true,
 
   addBlock: (block) =>
     set((state) => {
@@ -40,6 +44,9 @@ export const useCodeCraftStore = create<CodeCraftStore>((set) => ({
 
       let newBlocks;
       if (existingIndex !== -1) {
+        if (state.collisionDetectionEnabled && state.blocks[existingIndex].material !== 0) {
+          return state;
+        }
         newBlocks = [...state.blocks];
         newBlocks[existingIndex] = block;
       } else {
@@ -71,5 +78,14 @@ export const useCodeCraftStore = create<CodeCraftStore>((set) => ({
 
   setShowWelcomeModal: (show) => set({ showWelcomeModal: show }),
 
-  setIsFullscreen3D: (fullscreen) => set({ isFullscreen3D: fullscreen })
+  setIsFullscreen3D: (fullscreen) => set({ isFullscreen3D: fullscreen }),
+
+  setCollisionDetectionEnabled: (enabled) => set({ collisionDetectionEnabled: enabled }),
+
+  isPositionOccupied: (x, y, z) => {
+    const state = get();
+    return state.blocks.some(
+      (b) => b.position.x === x && b.position.y === y && b.position.z === z && b.material !== 0
+    );
+  }
 }));
