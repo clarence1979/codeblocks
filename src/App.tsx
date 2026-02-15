@@ -8,14 +8,15 @@ import { WelcomeModal } from './components/WelcomeModal';
 import { PrivacyModal } from './components/PrivacyModal';
 import { TermsModal } from './components/TermsModal';
 import { QuickExamples } from './components/QuickExamples';
-import { ApiKeyModal } from './components/ApiKeyModal';
+import { LoginModal } from './components/LoginModal';
 import { ResizeHandle } from './components/ResizeHandle';
 import { useCodeCraftStore } from './store/useCodeCraftStore';
 import { executePythonCode } from './utils/pythonExecutor';
 import { generateCodeFromPrompt } from './services/openai';
+import { attemptAutoLogin, loginWithCredentials, getStoredUser, logout, isInIframe, AuthUser } from './services/auth';
 import { LESSONS } from './data/lessons';
 import { Lesson } from './types';
-import { Boxes, Maximize2, Minimize2, ChevronLeft, ChevronRight, Wrench, Settings, BookOpen, Code, Box, Menu, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Boxes, Maximize2, Minimize2, ChevronLeft, ChevronRight, Wrench, Settings, BookOpen, Code, Box, Menu, X, ChevronUp, ChevronDown, LogOut, Loader } from 'lucide-react';
 
 function App() {
   const {
@@ -42,9 +43,10 @@ function App() {
   const [showCodeEditor, setShowCodeEditor] = useState(true);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [isApiKeyValid, setIsApiKeyValid] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [aiInputText, setAiInputText] = useState('');
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -80,71 +82,69 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Check URL parameter first (from parent iframe)
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlApiKey = urlParams.get('apiKey');
+    async function initializeAuth() {
+      setIsAuthenticating(true);
 
-    if (urlApiKey) {
-      // API key received from parent
-      localStorage.setItem('ai_api_key', urlApiKey);
-      setApiKey(urlApiKey);
-      setIsApiKeyValid(true);
-
-      // Clean URL to remove the API key
-      const url = new URL(window.location.href);
-      url.searchParams.delete('apiKey');
-      window.history.replaceState({}, document.title, url.toString());
-    } else {
-      // Fall back to localStorage
-      const savedApiKey = localStorage.getItem('ai_api_key');
-      if (savedApiKey) {
-        setApiKey(savedApiKey);
-        setIsApiKeyValid(true);
+      // First, check if user is already logged in (session storage)
+      const storedUser = getStoredUser();
+      if (storedUser) {
+        setCurrentUser(storedUser);
+        setIsAuthenticating(false);
+        return;
       }
-    }
 
-    // Listen for messages from parent window (if in iframe)
-    const handleMessage = (event: MessageEvent) => {
-      // Security: In production, validate event.origin
-      if (event.data && event.data.type === 'API_KEY_UPDATE') {
-        const newApiKey = event.data.apiKey;
-
-        if (newApiKey) {
-          // Parent sent a new API key
-          localStorage.setItem('ai_api_key', newApiKey);
-          setApiKey(newApiKey);
-          setIsApiKeyValid(true);
-        } else {
-          // Parent cleared the API key
-          localStorage.removeItem('ai_api_key');
-          setApiKey('');
-          setIsApiKeyValid(false);
+      // If in iframe, attempt auto-login
+      if (isInIframe()) {
+        const user = await attemptAutoLogin();
+        if (user) {
+          setCurrentUser(user);
+          setIsAuthenticating(false);
+          return;
         }
       }
-    };
 
-    window.addEventListener('message', handleMessage);
-
-    // Notify parent that we're ready to receive API key
-    if (window.parent !== window) {
-      window.parent.postMessage({ type: 'READY_FOR_API_KEY' }, '*');
+      // No stored user and auto-login failed (or not in iframe), show login
+      setIsAuthenticating(false);
+      setShowLoginModal(true);
     }
 
+    initializeAuth();
+
+    // Clear session on window close
+    const handleBeforeUnload = () => {
+      logout();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
-      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
 
-  const handleSaveApiKey = (key: string) => {
-    if (key) {
-      localStorage.setItem('ai_api_key', key);
-      setApiKey(key);
-      setIsApiKeyValid(true);
-    } else {
-      localStorage.removeItem('ai_api_key');
-      setApiKey('');
-      setIsApiKeyValid(false);
+  const handleLogin = async (username: string, password: string): Promise<boolean> => {
+    setIsLoggingIn(true);
+    try {
+      const user = await loginWithCredentials(username, password);
+      if (user) {
+        setCurrentUser(user);
+        setShowLoginModal(false);
+        addConsoleOutput(`Welcome, ${user.username}!`);
+        return true;
+      }
+      return false;
+    } finally {
+      setIsLoggingIn(false);
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setCurrentUser(null);
+    clearBlocks();
+    clearConsole();
+    setShowLoginModal(true);
+    addConsoleOutput('Logged out successfully');
   };
 
   useEffect(() => {
@@ -223,8 +223,8 @@ function App() {
   };
 
   const handleGenerateCode = async (prompt: string) => {
-    if (!isApiKeyValid || !apiKey) {
-      addConsoleOutput('Error: Please configure your OpenAI API key first.');
+    if (!currentUser || !currentUser.openaiApiKey) {
+      addConsoleOutput('Error: OpenAI API key not available. Please log in again.');
       return;
     }
 
@@ -232,7 +232,7 @@ function App() {
     addConsoleOutput('Generating code from AI prompt...');
 
     try {
-      const generatedCode = await generateCodeFromPrompt(prompt, apiKey);
+      const generatedCode = await generateCodeFromPrompt(prompt, currentUser.openaiApiKey);
       setCode(generatedCode);
       addConsoleOutput('Code generated successfully! Click "Run Code" to execute.');
       setAiInputText('');
@@ -240,12 +240,33 @@ function App() {
       if (error instanceof Error) {
         addConsoleOutput(`AI Error: ${error.message}`);
       } else {
-        addConsoleOutput('Failed to generate code. Please check your API key.');
+        addConsoleOutput('Failed to generate code. Please try again.');
       }
     } finally {
       setIsGeneratingCode(false);
     }
   };
+
+  if (isAuthenticating) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-950">
+        <div className="flex flex-col items-center gap-4">
+          <Loader className="w-12 h-12 text-blue-400 animate-spin" />
+          <p className="text-gray-400 text-lg">Authenticating...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="h-screen flex flex-col bg-gray-950">
+        {showLoginModal && (
+          <LoginModal onLogin={handleLogin} isLoading={isLoggingIn} />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-gray-950">
@@ -259,14 +280,6 @@ function App() {
 
       {showTermsModal && (
         <TermsModal onClose={() => setShowTermsModal(false)} />
-      )}
-
-      {showApiKeyModal && (
-        <ApiKeyModal
-          onClose={() => setShowApiKeyModal(false)}
-          onSave={handleSaveApiKey}
-          currentApiKey={apiKey}
-        />
       )}
 
       {!isFullscreen3D && (
@@ -289,16 +302,16 @@ function App() {
               </button>
             ) : (
               <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg">
+                  <Settings className="w-5 h-5 text-green-400" />
+                  <span className="text-sm text-gray-300">{currentUser.username}</span>
+                </div>
                 <button
-                  onClick={() => setShowApiKeyModal(true)}
-                  className={`p-2 rounded-lg transition-all hover:scale-110 ${
-                    isApiKeyValid
-                      ? 'bg-green-600/20 hover:bg-green-600/30'
-                      : 'bg-red-600/20 hover:bg-red-600/30'
-                  }`}
-                  title={isApiKeyValid ? 'API Key configured' : 'Configure API Key'}
+                  onClick={handleLogout}
+                  className="p-2 bg-red-600/20 hover:bg-red-600/30 rounded-lg transition-all hover:scale-110"
+                  title="Logout"
                 >
-                  <Settings className={`w-5 h-5 ${isApiKeyValid ? 'text-green-400' : 'text-red-400'}`} />
+                  <LogOut className="w-5 h-5 text-red-400" />
                 </button>
                 <form action="https://www.paypal.com/donate" method="post" target="_top" className="flex items-center">
                   <input type="hidden" name="hosted_button_id" value="PSXE6LDM3ZJDC" />
@@ -346,16 +359,16 @@ function App() {
 
           {isMobile && showMobileMenu && (
             <div className="mt-3 pt-3 border-t border-white/20 flex flex-col gap-2">
+              <div className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg">
+                <Settings className="w-5 h-5 text-green-400" />
+                <span className="text-white">{currentUser.username}</span>
+              </div>
               <button
-                onClick={() => setShowApiKeyModal(true)}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                  isApiKeyValid
-                    ? 'bg-green-600/20 text-green-400'
-                    : 'bg-red-600/20 text-red-400'
-                }`}
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600/20 text-red-400 rounded-lg transition-all"
               >
-                <Settings className="w-5 h-5" />
-                <span className="text-white">{isApiKeyValid ? 'API Key configured' : 'Configure API Key'}</span>
+                <LogOut className="w-5 h-5" />
+                <span className="text-white">Logout</span>
               </button>
               <a
                 href="https://teachingtools.dev"
@@ -413,7 +426,7 @@ function App() {
                     onAiInputChange={setAiInputText}
                     onGenerateCode={handleGenerateCode}
                     isGenerating={isGeneratingCode}
-                    hasApiKey={isApiKeyValid}
+                    hasApiKey={!!currentUser?.openaiApiKey}
                   />
                   <QuickExamples onLoadExample={handleLoadExample} />
                   <MaterialsPalette />
@@ -527,7 +540,7 @@ function App() {
                         onAiInputChange={setAiInputText}
                         onGenerateCode={handleGenerateCode}
                         isGenerating={isGeneratingCode}
-                        hasApiKey={isApiKeyValid}
+                        hasApiKey={!!currentUser?.openaiApiKey}
                       />
                     </div>
                     <QuickExamples onLoadExample={handleLoadExample} />
