@@ -1,0 +1,19 @@
+# Block sensitive files
+/.env           /index.html     404
+/.env.*         /index.html     404
+/.git           /index.html     404
+/.git/*         /index.html     404
+/config.json    /index.html     404
+/.DS_Store      /index.html     404
+/*.sql          /index.html     404
+/*.bak          /index.html     404
+/*.backup       /index.html     404
+/*.log          /index.html     404
+/wp-admin/*     /index.html     404
+/wp-login.php   /index.html     404
+/phpinfo.php    /index.html     404
+/.htaccess      /index.html     404
+/.htpasswd      /index.html     404
+
+# SPA fallback
+/*              /index.html     200
