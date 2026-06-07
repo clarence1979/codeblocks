@@ -186,5 +186,6 @@ export function getStoredUser(): AuthUser | null {
 
 export function logout(): void {
   sessionStorage.removeItem('auth_user');
-  localStorage.clear();
+  const viteKeys = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY', 'VITE_OPENAI_API_KEY', 'VITE_CLAUDE_API_KEY', 'VITE_GEMINI_API_KEY', 'VITE_REPLICATE_API_KEY'];
+  viteKeys.forEach(key => localStorage.removeItem(key));
 }

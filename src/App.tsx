@@ -13,7 +13,8 @@ import { ResizeHandle } from './components/ResizeHandle';
 import { useCodeCraftStore } from './store/useCodeCraftStore';
 import { executePythonCode } from './utils/pythonExecutor';
 import { generateCodeFromPrompt } from './services/openai';
-import { attemptAutoLogin, loginWithCredentials, getStoredUser, logout, isInIframe, AuthUser } from './services/auth';
+import { loginWithCredentials, getStoredUser, logout, AuthUser } from './services/auth';
+import { attemptAutoLogin, isInIframe } from './utils/auto-login';
 import { LESSONS } from './data/lessons';
 import { Lesson } from './types';
 import { Boxes, Maximize2, Minimize2, ChevronLeft, ChevronRight, Wrench, Settings, BookOpen, Code, Box, Menu, X, ChevronUp, ChevronDown, LogOut, Loader } from 'lucide-react';
@@ -93,11 +94,16 @@ function App() {
         return;
       }
 
-      // If in iframe, attempt auto-login
+      // If in iframe, attempt auto-login via postMessage
       if (isInIframe()) {
-        const user = await attemptAutoLogin();
-        if (user) {
-          setCurrentUser(user);
+        const result = await attemptAutoLogin();
+        if (result.authenticated) {
+          const authUser: AuthUser = {
+            username: result.username || '',
+            isAdmin: result.isAdmin || false,
+            openaiApiKey: result.apiKey || localStorage.getItem('VITE_OPENAI_API_KEY') || '',
+          };
+          setCurrentUser(authUser);
           setIsAuthenticating(false);
           return;
         }
@@ -223,7 +229,8 @@ function App() {
   };
 
   const handleGenerateCode = async (prompt: string) => {
-    if (!currentUser || !currentUser.openaiApiKey) {
+    const apiKey = currentUser?.openaiApiKey || localStorage.getItem('VITE_OPENAI_API_KEY') || '';
+    if (!apiKey) {
       addConsoleOutput('Error: OpenAI API key not available. Please log in again.');
       return;
     }
@@ -232,7 +239,7 @@ function App() {
     addConsoleOutput('Generating code from AI prompt...');
 
     try {
-      const generatedCode = await generateCodeFromPrompt(prompt, currentUser.openaiApiKey);
+      const generatedCode = await generateCodeFromPrompt(prompt, apiKey);
       setCode(generatedCode);
       addConsoleOutput('Code generated successfully! Click "Run Code" to execute.');
       setAiInputText('');
@@ -426,7 +433,7 @@ function App() {
                     onAiInputChange={setAiInputText}
                     onGenerateCode={handleGenerateCode}
                     isGenerating={isGeneratingCode}
-                    hasApiKey={!!currentUser?.openaiApiKey}
+                    hasApiKey={!!(currentUser?.openaiApiKey || localStorage.getItem('VITE_OPENAI_API_KEY'))}
                   />
                   <QuickExamples onLoadExample={handleLoadExample} />
                   <MaterialsPalette />
@@ -540,7 +547,7 @@ function App() {
                         onAiInputChange={setAiInputText}
                         onGenerateCode={handleGenerateCode}
                         isGenerating={isGeneratingCode}
-                        hasApiKey={!!currentUser?.openaiApiKey}
+                        hasApiKey={!!(currentUser?.openaiApiKey || localStorage.getItem('VITE_OPENAI_API_KEY'))}
                       />
                     </div>
                     <QuickExamples onLoadExample={handleLoadExample} />
