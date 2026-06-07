@@ -1,6 +1,21 @@
 const STANDALONE_SUPABASE_URL = 'https://qfitpwdrswvnbmzvkoyd.supabase.co';
 const STANDALONE_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmaXRwd2Ryc3d2bmJtenZrb3lkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzNTc4NTIsImV4cCI6MjA3NjkzMzg1Mn0.owLaj3VrcyR7_LW9xMwOTTFQupbDKlvAlVwYtbidiNE';
 
+function isTrustedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    return (
+      url.hostname === 'teachingtools.dev' ||
+      url.hostname.endsWith('.teachingtools.dev') ||
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1'
+    );
+  } catch {
+    return false;
+  }
+}
+
 export interface AuthUser {
   username: string;
   isAdmin: boolean;
@@ -64,6 +79,7 @@ export async function attemptAutoLogin(): Promise<AuthUser | null> {
     window.parent.postMessage({ type: 'REQUEST_API_VALUES' }, '*');
 
     const handleMessage = async (event: MessageEvent) => {
+      if (!isTrustedOrigin(event.origin)) return;
       if (event.data.type === 'API_VALUES_RESPONSE') {
         window.removeEventListener('message', handleMessage);
 

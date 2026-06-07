@@ -1,14 +1,8 @@
 /*
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   X-Content-Type-Options: nosniff
   X-XSS-Protection: 1; mode=block
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   X-Robots-Tag: noindex, nofollow
-
-/.env
-  X-Robots-Tag: noindex, nofollow
-  Cache-Control: no-store
-
-/.git/*
-  X-Robots-Tag: noindex, nofollow
-  Cache-Control: no-store
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://qfitpwdrswvnbmzvkoyd.supabase.co wss://qfitpwdrswvnbmzvkoyd.supabase.co https://*.supabase.co wss://*.supabase.co https://api.openai.com https://cdn.jsdelivr.net; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'none'; frame-ancestors 'self' https://teachingtools.dev https://*.teachingtools.dev; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests
