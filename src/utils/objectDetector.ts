@@ -14,16 +14,6 @@ function getBlockKey(pos: Position): string {
   return `${pos.x},${pos.y},${pos.z}`;
 }
 
-function areAdjacent(pos1: Position, pos2: Position): boolean {
-  const dx = Math.abs(pos1.x - pos2.x);
-  const dy = Math.abs(pos1.y - pos2.y);
-  const dz = Math.abs(pos1.z - pos2.z);
-
-  return (dx === 1 && dy === 0 && dz === 0) ||
-         (dx === 0 && dy === 1 && dz === 0) ||
-         (dx === 0 && dy === 0 && dz === 1);
-}
-
 function calculateCenter(blocks: Block[]): Position {
   if (blocks.length === 0) return { x: 0, y: 0, z: 0 };
 
@@ -102,24 +92,27 @@ export function detectObjects(blocks: Block[]): DetectedObject[] {
     return [];
   }
 
+  // Look neighbours up by position instead of scanning every block, so this stays quick for big builds.
+  const byKey = new Map<string, Block>();
+  for (const block of validBlocks) byKey.set(getBlockKey(block.position), block);
+
   const visited = new Set<string>();
   const objects: DetectedObject[] = [];
+  const steps = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
   function floodFill(startBlock: Block): Block[] {
-    const objectBlocks: Block[] = [];
-    const queue: Block[] = [startBlock];
-    const key = getBlockKey(startBlock.position);
-    visited.add(key);
+    const objectBlocks: Block[] = [startBlock];
+    visited.add(getBlockKey(startBlock.position));
 
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      objectBlocks.push(current);
-
-      for (const block of validBlocks) {
-        const blockKey = getBlockKey(block.position);
-        if (!visited.has(blockKey) && areAdjacent(current.position, block.position)) {
-          visited.add(blockKey);
-          queue.push(block);
+    for (let head = 0; head < objectBlocks.length; head++) {
+      const { x, y, z } = objectBlocks[head].position;
+      for (const [dx, dy, dz] of steps) {
+        const key = `${x + dx},${y + dy},${z + dz}`;
+        if (visited.has(key)) continue;
+        const next = byKey.get(key);
+        if (next) {
+          visited.add(key);
+          objectBlocks.push(next);
         }
       }
     }

@@ -1,4 +1,4 @@
-import { Book, ChevronRight, Copy, Check } from 'lucide-react';
+import { Book, ChevronRight, Check } from 'lucide-react';
 import { LESSONS } from '../data/lessons';
 import { Lesson } from '../types';
 import { useState } from 'react';
@@ -9,7 +9,7 @@ interface LessonPanelProps {
 }
 
 export function LessonPanel({ currentLessonId, onSelectLesson }: LessonPanelProps) {
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [copyNote, setCopyNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   const volumes = [
     { id: 1, title: 'Introduction', lessons: LESSONS.filter(l => l.volume === 1) },
@@ -22,11 +22,11 @@ export function LessonPanel({ currentLessonId, onSelectLesson }: LessonPanelProp
   const handleCopyCode = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
-      setCopiedCode(code);
-      setTimeout(() => setCopiedCode(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+      setCopyNote({ ok: true, text: 'Code copied. Click in the editor and press Ctrl+V (Cmd+V on a Mac) to paste it.' });
+    } catch {
+      setCopyNote({ ok: false, text: 'Your browser blocked copying here. Select the code with the mouse and press Ctrl+C instead.' });
     }
+    setTimeout(() => setCopyNote(null), 4000);
   };
 
   const formatInstructions = (text: string) => {
@@ -46,7 +46,7 @@ export function LessonPanel({ currentLessonId, onSelectLesson }: LessonPanelProp
           <button
             data-code="${code.replace(/"/g, '&quot;')}"
             data-block-id="${blockId}"
-            class="copy-code-btn absolute top-2 right-2 p-1 bg-gray-800/80 hover:bg-gray-700 rounded transition-all opacity-0 group-hover:opacity-100"
+            class="copy-code-btn absolute top-2 right-2 p-1 bg-gray-800/80 hover:bg-gray-700 rounded transition-all opacity-60 group-hover:opacity-100 focus:opacity-100"
             title="Copy code"
           >
             <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,6 +77,12 @@ export function LessonPanel({ currentLessonId, onSelectLesson }: LessonPanelProp
               {currentLesson.id}. {currentLesson.title}
             </h3>
             <p className="text-sm text-gray-400 mb-3">{currentLesson.description}</p>
+            {copyNote && (
+              <p role="status" className={`text-xs mb-2 flex items-center gap-1 ${copyNote.ok ? 'text-green-400' : 'text-amber-300'}`}>
+                {copyNote.ok && <Check className="w-3.5 h-3.5" />}
+                {copyNote.text}
+              </p>
+            )}
             <div className="prose prose-invert prose-sm max-w-none">
               <div
                 className="text-gray-300 whitespace-pre-wrap"

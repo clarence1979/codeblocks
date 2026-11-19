@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CodeEditor } from './components/CodeEditor';
 import { ConsoleOutput } from './components/ConsoleOutput';
 import { Scene3D } from './components/Scene3D';
@@ -8,16 +8,16 @@ import { WelcomeModal } from './components/WelcomeModal';
 import { PrivacyModal } from './components/PrivacyModal';
 import { TermsModal } from './components/TermsModal';
 import { QuickExamples } from './components/QuickExamples';
-import { LoginModal } from './components/LoginModal';
+import { AiStatusDot } from './components/AiStatusDot';
 import { ResizeHandle } from './components/ResizeHandle';
 import { useCodeCraftStore } from './store/useCodeCraftStore';
-import { executePythonCode } from './utils/pythonExecutor';
+import { runPython, stopPython, preloadPython } from './utils/pythonExecutor';
 import { generateCodeFromPrompt } from './services/openai';
-import { loginWithCredentials, getStoredUser, logout, AuthUser } from './services/auth';
-import { attemptAutoLogin, isInIframe } from './utils/auto-login';
+import { aiAccess } from './services/aiAccess';
+import logoUrl from './assets/digivec_logo.png';
 import { LESSONS } from './data/lessons';
 import { Lesson } from './types';
-import { Boxes, Maximize2, Minimize2, ChevronLeft, ChevronRight, Wrench, Settings, BookOpen, Code, Box, Menu, X, ChevronUp, ChevronDown, LogOut, Loader } from 'lucide-react';
+import { Boxes, Maximize2, Minimize2, ChevronLeft, ChevronRight, Wrench, BookOpen, Code, Box, Menu, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 function App() {
   const {
@@ -28,15 +28,17 @@ function App() {
     showWelcomeModal,
     blockCount,
     isFullscreen3D,
-    addBlock,
+    applyBlocks,
     clearBlocks,
+    snapshotWorld,
+    maxBlockX,
     addConsoleOutput,
+    addConsoleLines,
     clearConsole,
     setIsRunning,
     setCurrentLesson,
     setShowWelcomeModal,
-    setIsFullscreen3D,
-    isPositionOccupied
+    setIsFullscreen3D
   } = useCodeCraftStore();
 
   const [code, setCode] = useState('');
@@ -44,10 +46,6 @@ function App() {
   const [showCodeEditor, setShowCodeEditor] = useState(true);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [isAuthenticating, setIsAuthenticating] = useState(true);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [aiInputText, setAiInputText] = useState('');
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -55,7 +53,9 @@ function App() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [lessonsPanelWidth, setLessonsPanelWidth] = useState(320);
   const [codeEditorWidth, setCodeEditorWidth] = useState(60);
-  const [consoleHeight, setConsoleHeight] = useState(200);
+  // About a third of the window, so short laptop screens still show a useful amount of code.
+  const [consoleHeight, setConsoleHeight] = useState(() => Math.max(220, Math.min(300, Math.round(window.innerHeight * 0.33))));
+  const [consoleOpen, setConsoleOpen] = useState(true);
   const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
   const [autoOffsetEnabled, setAutoOffsetEnabled] = useState(true);
 
@@ -82,76 +82,11 @@ function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Start Python and the AI check straight away so both are ready by the first click.
   useEffect(() => {
-    async function initializeAuth() {
-      setIsAuthenticating(true);
-
-      // First, check if user is already logged in (session storage)
-      const storedUser = getStoredUser();
-      if (storedUser) {
-        setCurrentUser(storedUser);
-        setIsAuthenticating(false);
-        return;
-      }
-
-      // If in iframe, attempt auto-login via postMessage
-      if (isInIframe()) {
-        const result = await attemptAutoLogin();
-        if (result.authenticated) {
-          const authUser: AuthUser = {
-            username: result.username || '',
-            isAdmin: result.isAdmin || false,
-            openaiApiKey: result.apiKey || localStorage.getItem('VITE_OPENAI_API_KEY') || '',
-          };
-          setCurrentUser(authUser);
-          setIsAuthenticating(false);
-          return;
-        }
-      }
-
-      // No stored user and auto-login failed (or not in iframe), show login
-      setIsAuthenticating(false);
-      setShowLoginModal(true);
-    }
-
-    initializeAuth();
-
-    // Clear session on window close
-    const handleBeforeUnload = () => {
-      logout();
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
+    preloadPython();
+    aiAccess.start();
   }, []);
-
-  const handleLogin = async (username: string, password: string): Promise<boolean> => {
-    setIsLoggingIn(true);
-    try {
-      const user = await loginWithCredentials(username, password);
-      if (user) {
-        setCurrentUser(user);
-        setShowLoginModal(false);
-        addConsoleOutput(`Welcome, ${user.username}!`);
-        return true;
-      }
-      return false;
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    setCurrentUser(null);
-    clearBlocks();
-    clearConsole();
-    setShowLoginModal(true);
-    addConsoleOutput('Logged out successfully');
-  };
 
   useEffect(() => {
     const lesson = LESSONS.find(l => l.id === currentLesson);
@@ -160,39 +95,38 @@ function App() {
     }
   }, [currentLesson]);
 
+  const runningRef = useRef(false);
+
   const handleRunCode = async (codeToRun: string) => {
+    if (runningRef.current) return;
+    runningRef.current = true;
     setIsRunning(true);
     clearConsole();
     addConsoleOutput('Running code...');
 
-    // Calculate offset to avoid overlapping with existing structures
-    let offset = { x: 0, y: 0, z: 0 };
-    if (autoOffsetEnabled && blocks.length > 0) {
-      // Find the maximum X coordinate of existing blocks
-      const maxX = Math.max(...blocks.map(b => b.position.x));
-      // Place new structure 15 units to the right
+    // Place a new structure beside what is already built, so it doesn't overlap.
+    const offset = { x: 0, y: 0, z: 0 };
+    const maxX = autoOffsetEnabled ? maxBlockX() : null;
+    if (maxX !== null) {
       offset.x = maxX + 15;
       addConsoleOutput(`Placing new structure at offset X=${offset.x} to avoid overlaps`);
     }
 
     try {
-      await executePythonCode(
-        codeToRun,
-        (x, y, z, material) => {
-          addBlock({ position: { x, y, z }, material });
-        },
-        (message) => {
-          addConsoleOutput(message);
-        },
-        () => {
-          clearConsole();
-        },
-        isPositionOccupied,
-        offset
-      );
-      addConsoleOutput('Code execution complete!');
+      const result = await runPython(codeToRun, snapshotWorld(), offset, {
+        onBlocks: applyBlocks,
+        onLines: addConsoleLines,
+        onClear: clearConsole
+      });
+      if (result.stopped) {
+        addConsoleOutput('Stopped. Blocks placed before you pressed Stop are kept.');
+      } else if (result.ok) {
+        addConsoleOutput('Code execution complete!');
+      } else {
+        addConsoleOutput('Error: Your code stopped early. Read the red lines above to see why.');
+      }
 
-      // Re-enable auto-offset after successful run
+      // Re-enable auto-offset after a run
       if (!autoOffsetEnabled) {
         setAutoOffsetEnabled(true);
       }
@@ -201,8 +135,13 @@ function App() {
         addConsoleOutput(`Error: ${error.message}`);
       }
     } finally {
+      runningRef.current = false;
       setIsRunning(false);
     }
+  };
+
+  const handleStop = () => {
+    stopPython();
   };
 
   const handleClearWorld = () => {
@@ -213,6 +152,7 @@ function App() {
   };
 
   const handleSelectLesson = (lesson: Lesson) => {
+    if (runningRef.current) stopPython();
     setCurrentLesson(lesson.id);
     clearBlocks();
     clearConsole();
@@ -221,6 +161,7 @@ function App() {
   };
 
   const handleLoadExample = (exampleCode: string) => {
+    if (runningRef.current) stopPython();
     setCode(exampleCode);
     clearBlocks();
     clearConsole();
@@ -229,9 +170,9 @@ function App() {
   };
 
   const handleGenerateCode = async (prompt: string) => {
-    const apiKey = currentUser?.openaiApiKey || localStorage.getItem('VITE_OPENAI_API_KEY') || '';
+    const apiKey = aiAccess.keyForRequest();
     if (!apiKey) {
-      addConsoleOutput('Error: OpenAI API key not available. Please log in again.');
+      addConsoleOutput('AI Error: AI is not set up yet. Enter an OpenAI key in the AI Input box, or sign in at teachingtools.dev.');
       return;
     }
 
@@ -247,33 +188,12 @@ function App() {
       if (error instanceof Error) {
         addConsoleOutput(`AI Error: ${error.message}`);
       } else {
-        addConsoleOutput('Failed to generate code. Please try again.');
+        addConsoleOutput('AI Error: Failed to generate code. Please try again.');
       }
     } finally {
       setIsGeneratingCode(false);
     }
   };
-
-  if (isAuthenticating) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-950">
-        <div className="flex flex-col items-center gap-4">
-          <Loader className="w-12 h-12 text-blue-400 animate-spin" />
-          <p className="text-gray-400 text-lg">Authenticating...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <div className="h-screen flex flex-col bg-gray-950">
-        {showLoginModal && (
-          <LoginModal onLogin={handleLogin} isLoading={isLoggingIn} />
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="h-screen flex flex-col bg-gray-950">
@@ -304,32 +224,28 @@ function App() {
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
+                aria-label={showMobileMenu ? 'Close menu' : 'Open menu'}
+                aria-expanded={showMobileMenu}
               >
                 {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
             ) : (
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg">
-                  <Settings className="w-5 h-5 text-green-400" />
-                  <span className="text-sm text-gray-300">{currentUser.username}</span>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="p-2 bg-red-600/20 hover:bg-red-600/30 rounded-lg transition-all hover:scale-110"
-                  title="Logout"
-                >
-                  <LogOut className="w-5 h-5 text-red-400" />
-                </button>
+                <AiStatusDot className="px-3 py-2 bg-gray-900/40 rounded-lg text-white" />
                 <form action="https://www.paypal.com/donate" method="post" target="_top" className="flex items-center">
                   <input type="hidden" name="hosted_button_id" value="PSXE6LDM3ZJDC" />
-                  <input
-                    type="image"
-                    src="https://www.paypalobjects.com/en_AU/i/btn/btn_donateCC_LG.gif"
-                    name="submit"
-                    title="PayPal - The safer, easier way to pay online!"
-                    alt="Donate with PayPal button"
-                    className="h-8 w-auto hover:opacity-80 transition-opacity"
-                  />
+                  <button type="submit" title="PayPal - The safer, easier way to pay online!" className="hover:opacity-80 transition-opacity">
+                    <img
+                      src="https://www.paypalobjects.com/en_AU/i/btn/btn_donateCC_LG.gif"
+                      alt="Donate with PayPal"
+                      className="h-8 w-auto"
+                      onError={(e) => {
+                        // Offline: hide the donate button rather than show a broken image.
+                        const form = e.currentTarget.closest('form');
+                        if (form) form.style.display = 'none';
+                      }}
+                    />
+                  </button>
                 </form>
                 <a
                   href="https://digitalvector.com.au"
@@ -339,9 +255,9 @@ function App() {
                   title="Digital Vector"
                 >
                   <img
-                    src="/digivec_logo.png"
+                    src={logoUrl}
                     alt="Digital Vector"
-                    className="h-16 w-auto"
+                    className="h-12 w-auto"
                   />
                 </a>
                 <a
@@ -366,17 +282,9 @@ function App() {
 
           {isMobile && showMobileMenu && (
             <div className="mt-3 pt-3 border-t border-white/20 flex flex-col gap-2">
-              <div className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg">
-                <Settings className="w-5 h-5 text-green-400" />
-                <span className="text-white">{currentUser.username}</span>
+              <div className="w-full flex items-center justify-center px-4 py-2 bg-gray-900/40 rounded-lg text-white">
+                <AiStatusDot />
               </div>
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600/20 text-red-400 rounded-lg transition-all"
-              >
-                <LogOut className="w-5 h-5" />
-                <span className="text-white">Logout</span>
-              </button>
               <a
                 href="https://teachingtools.dev"
                 target="_blank"
@@ -418,11 +326,12 @@ function App() {
 
               {mobileView === 'code' && (
                 <div className="w-full h-full flex flex-col">
-                  <div className="flex-1 overflow-hidden">
+                  <div className="flex-1 min-h-[160px] overflow-hidden">
                     <CodeEditor
                       code={code}
                       onCodeChange={setCode}
                       onRunCode={handleRunCode}
+                      onStop={handleStop}
                       onClearWorld={handleClearWorld}
                       isRunning={isRunning}
                     />
@@ -433,10 +342,12 @@ function App() {
                     onAiInputChange={setAiInputText}
                     onGenerateCode={handleGenerateCode}
                     isGenerating={isGeneratingCode}
-                    hasApiKey={!!(currentUser?.openaiApiKey || localStorage.getItem('VITE_OPENAI_API_KEY'))}
+                    expandedHeight="h-[22rem]"
                   />
-                  <QuickExamples onLoadExample={handleLoadExample} />
-                  <MaterialsPalette />
+                  <div className="flex-shrink-0">
+                    <QuickExamples onLoadExample={handleLoadExample} />
+                    <MaterialsPalette />
+                  </div>
                 </div>
               )}
 
@@ -498,6 +409,7 @@ function App() {
                     onClick={() => setShowLessons(false)}
                     className="absolute top-4 right-4 z-10 p-2 bg-gray-800/90 hover:bg-gray-700 text-white rounded-lg transition-colors shadow-lg"
                     title="Hide Lessons"
+                    aria-label="Hide Lessons"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
@@ -516,6 +428,7 @@ function App() {
                 onClick={() => setShowLessons(true)}
                 className="absolute top-4 left-4 z-20 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-lg"
                 title="Show Lessons"
+                aria-label="Show Lessons"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -525,13 +438,15 @@ function App() {
               {showCodeEditor && (
                 <>
                   <div style={{ width: `${codeEditorWidth}%` }} className="flex flex-col relative flex-shrink-0">
-                    <div style={{ height: `calc(100% - ${consoleHeight}px)` }} className="overflow-hidden">
+                    <div className="flex-1 min-h-[120px] overflow-hidden">
                       <CodeEditor
                         code={code}
                         onCodeChange={setCode}
                         onRunCode={handleRunCode}
+                        onStop={handleStop}
                         onClearWorld={handleClearWorld}
                         isRunning={isRunning}
+                        reserveLeft
                       />
                     </div>
                     <ResizeHandle
@@ -540,22 +455,27 @@ function App() {
                         setConsoleHeight(prev => Math.max(100, Math.min(500, prev - delta)));
                       }}
                     />
-                    <div style={{ height: `${consoleHeight}px` }} className="overflow-hidden">
+                    <div style={consoleOpen ? { height: `${consoleHeight}px` } : undefined} className="overflow-hidden flex-shrink-0">
                       <ConsoleOutput
                         output={consoleOutput}
                         aiInputText={aiInputText}
                         onAiInputChange={setAiInputText}
                         onGenerateCode={handleGenerateCode}
                         isGenerating={isGeneratingCode}
-                        hasApiKey={!!(currentUser?.openaiApiKey || localStorage.getItem('VITE_OPENAI_API_KEY'))}
+                        expandedHeight="h-full"
+                        expanded={consoleOpen}
+                        onToggle={() => setConsoleOpen((v) => !v)}
                       />
                     </div>
-                    <QuickExamples onLoadExample={handleLoadExample} />
-                    <MaterialsPalette />
+                    <div className="flex-shrink-0">
+                      <QuickExamples onLoadExample={handleLoadExample} />
+                      <MaterialsPalette />
+                    </div>
                     <button
                       onClick={() => setShowCodeEditor(false)}
-                      className="absolute top-4 left-4 z-10 p-2 bg-gray-800/90 hover:bg-gray-700 text-white rounded-lg transition-colors shadow-lg"
+                      className="absolute top-1.5 left-2 z-10 p-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
                       title="Hide Code Editor"
+                      aria-label="Hide Code Editor"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -578,17 +498,18 @@ function App() {
                     onClick={() => setShowCodeEditor(true)}
                     className="absolute top-4 left-4 z-10 p-2 bg-gray-800/90 hover:bg-gray-700 text-white rounded-lg transition-colors shadow-lg"
                     title="Show Code Editor"
+                    aria-label="Show Code Editor"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
                 )}
                 <button
                   onClick={() => setIsFullscreen3D(true)}
-                  className="absolute top-4 right-4 z-10 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 shadow-lg"
+                  className="absolute top-4 right-4 z-10 p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 shadow-lg"
                   title="Fullscreen 3D View"
+                  aria-label="Fullscreen 3D View"
                 >
                   <Maximize2 className="w-4 h-4" />
-                  Fullscreen
                 </button>
               </div>
             </div>
@@ -600,17 +521,20 @@ function App() {
         <footer className="bg-gray-900 border-t border-gray-700 relative">
           <button
             onClick={() => setIsFooterCollapsed(!isFooterCollapsed)}
-            className="absolute -top-8 right-4 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white p-2 rounded-t-lg transition-colors shadow-lg"
+            className={`absolute right-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors ${isFooterCollapsed ? 'top-0 px-2 py-0.5 text-xs flex items-center gap-1' : 'top-2 p-1.5'}`}
             title={isFooterCollapsed ? "Show footer" : "Hide footer"}
+            aria-label={isFooterCollapsed ? "Show footer" : "Hide footer"}
+            aria-expanded={!isFooterCollapsed}
           >
-            {isFooterCollapsed ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {isFooterCollapsed ? <><ChevronUp size={14} /> Footer</> : <ChevronDown size={16} />}
           </button>
+          {isFooterCollapsed && <div className="h-5" />}
 
           {!isFooterCollapsed && (
-            <div className="px-6 py-4">
+            <div className="pl-6 pr-12 py-4">
               <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-400">
                 <div className="flex flex-col items-center md:items-start gap-1">
-                  <p className="text-gray-300">© 2025 Digital Vector. Educational use only.</p>
+                  <p className="text-gray-300">© 2025–2026 Digital Vector. Educational use only.</p>
                   <p className="text-xs">Compliant with Australian Privacy Principles (APPs) & Australian Curriculum standards.</p>
                 </div>
 

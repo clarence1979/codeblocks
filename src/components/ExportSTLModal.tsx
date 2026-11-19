@@ -1,8 +1,8 @@
 import { X, Download, Box } from 'lucide-react';
 import { Block } from '../types';
 import { detectObjects } from '../utils/objectDetector';
-import { exportToSTL } from '../utils/stlExporter';
-import { useState } from 'react';
+import { exportToSTL, downloadBlob, stlFileName } from '../utils/stlExporter';
+import { useMemo, useState } from 'react';
 
 interface ExportSTLModalProps {
   blocks: Block[];
@@ -10,7 +10,8 @@ interface ExportSTLModalProps {
 }
 
 export function ExportSTLModal({ blocks, onClose }: ExportSTLModalProps) {
-  const objects = detectObjects(blocks);
+  const objects = useMemo(() => detectObjects(blocks), [blocks]);
+  const [notice, setNotice] = useState('');
   const [selectedObjects, setSelectedObjects] = useState<Set<number>>(
     new Set(objects.map((_, idx) => idx))
   );
@@ -23,11 +24,17 @@ export function ExportSTLModal({ blocks, onClose }: ExportSTLModalProps) {
       newSelected.add(index);
     }
     setSelectedObjects(newSelected);
+    setNotice('');
+  };
+
+  const selectAll = (on: boolean) => {
+    setSelectedObjects(on ? new Set(objects.map((_, idx) => idx)) : new Set());
+    setNotice('');
   };
 
   const handleExport = () => {
     if (selectedObjects.size === 0) {
-      alert('Please select at least one object to export.');
+      setNotice('Tick at least one object above, then export.');
       return;
     }
 
@@ -35,21 +42,7 @@ export function ExportSTLModal({ blocks, onClose }: ExportSTLModalProps) {
       .filter((_, idx) => selectedObjects.has(idx))
       .flatMap(obj => obj.blocks);
 
-    const stlContent = exportToSTL(selectedBlocks);
-    const blob = new Blob([stlContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-
-    const timestamp = new Date().toISOString().slice(0, 16).replace('T', '-').replace(':', '-');
-    const filename = `code-blocks-${timestamp}.stl`;
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
+    downloadBlob(exportToSTL(selectedBlocks), stlFileName());
     onClose();
   };
 
@@ -109,9 +102,13 @@ export function ExportSTLModal({ blocks, onClose }: ExportSTLModalProps) {
         </div>
 
         <div className="p-6">
-          <p className="text-gray-300 mb-4">
+          <p className="text-gray-300 mb-2">
             Select the objects you want to export to STL format for 3D printing or animation:
           </p>
+          <div className="flex gap-3 mb-3 text-sm">
+            <button type="button" onClick={() => selectAll(true)} className="text-blue-400 hover:text-blue-300">Select all</button>
+            <button type="button" onClick={() => selectAll(false)} className="text-blue-400 hover:text-blue-300">Select none</button>
+          </div>
 
           <div className="space-y-2 max-h-96 overflow-y-auto mb-6">
             {objects.map((obj, idx) => (
@@ -131,13 +128,16 @@ export function ExportSTLModal({ blocks, onClose }: ExportSTLModalProps) {
                     <span className="text-white font-medium">{obj.name}</span>
                   </div>
                   <div className="text-sm text-gray-400 mt-1">
-                    {obj.blocks.length} blocks • Center: ({obj.center.x.toFixed(1)}, {obj.center.y.toFixed(1)}, {obj.center.z.toFixed(1)})
+                    {obj.blocks.length.toLocaleString('en-US')} blocks • Center: ({obj.center.x.toFixed(1)}, {obj.center.y.toFixed(1)}, {obj.center.z.toFixed(1)})
                   </div>
                 </div>
               </label>
             ))}
           </div>
 
+          {notice && (
+            <p role="alert" className="mb-3 text-sm text-amber-300">{notice}</p>
+          )}
           <div className="flex gap-3">
             <button
               onClick={onClose}
@@ -147,8 +147,8 @@ export function ExportSTLModal({ blocks, onClose }: ExportSTLModalProps) {
             </button>
             <button
               onClick={handleExport}
-              disabled={selectedObjects.size === 0}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              aria-disabled={selectedObjects.size === 0}
+              className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors flex items-center justify-center gap-2 ${selectedObjects.size === 0 ? 'bg-blue-600/50 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
               <Download size={18} />
               Export Selected ({selectedObjects.size})

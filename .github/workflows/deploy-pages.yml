@@ -1,4 +1,5 @@
-# Builds the Vite app and publishes it to GitHub Pages (codecraft.teachingtools.dev).
+# Builds Code Blocks as one standalone HTML file and publishes it to GitHub Pages
+# (codecraft.teachingtools.dev). The same file is what goes into presac1a as codecraft.html.
 # Runs on every push to main, and can be run by hand from the Actions tab.
 name: Deploy to GitHub Pages
 
@@ -27,12 +28,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      # Keep the custom domain with the published files.
-      - run: cp CNAME dist/CNAME
+      # Publish only the single page (as the front page), plus the custom domain and robots.txt.
+      - run: |
+          mkdir site
+          cp dist/codecraft.html site/index.html
+          cp CNAME site/CNAME
+          cp site-extra/robots.txt site/robots.txt
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
 
   deploy:
     needs: build

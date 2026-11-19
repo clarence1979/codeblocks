@@ -1,6 +1,20 @@
+import { MATERIALS } from '../data/materials';
+
+// Built from the real material list so the AI can only suggest names that exist.
+const MATERIAL_LIST = Object.keys(MATERIALS)
+  .filter((name) => name !== 'air')
+  .map((name) => `'${name}'`)
+  .join(', ') + "\n- 'air' removes a block";
+
+/** Take the code out of a reply even if the AI wrapped it in a markdown block. */
+function extractCode(reply: string): string {
+  const fenced = reply.match(/```(?:python|py)?\s*\n([\s\S]*?)```/i);
+  return (fenced ? fenced[1] : reply).trim();
+}
+
 export async function generateCodeFromPrompt(prompt: string, apiKey: string): Promise<string> {
   if (!apiKey) {
-    throw new Error('OpenAI API key is required');
+    throw new Error('AI is not set up yet');
   }
 
   const systemPrompt = `You are a Python code generator for a 3D block-building educational environment called "Code Blocks".
@@ -27,17 +41,8 @@ API Usage:
 - x and z are horizontal coordinates
 - Grid area is 100x100, so you can build large structures
 
-Available materials (ONLY use these exact names with materials dictionary):
-- Basic blocks: 'stone', 'cobblestone', 'mossy_cobblestone', 'dirt', 'grass', 'sand', 'gravel'
-- Wood: 'planks_oak', 'wood', 'bookshelf', 'leaves'
-- Glass & transparent: 'glass', 'ice', 'packed_ice', 'water'
-- Stone variants: 'brick', 'obsidian', 'quartz', 'terracotta', 'prismarine', 'end_stone', 'purpur'
-- Ores & metals: 'diamond', 'emerald', 'gold', 'iron', 'copper', 'lapis', 'coal', 'redstone'
-- Wool colors: 'wool_white', 'wool_black', 'wool_red', 'wool_orange', 'wool_yellow', 'wool_green', 'wool_blue', 'wool_purple', 'wool_pink', 'wool_cyan', 'wool_brown', 'wool_lime', 'wool_gray', 'wool_light_gray'
-- Concrete colors: 'concrete_white', 'concrete_black', 'concrete_red', 'concrete_orange', 'concrete_yellow', 'concrete_green', 'concrete_blue', 'concrete_purple', 'concrete_pink', 'concrete_cyan', 'concrete_brown', 'concrete_lime', 'concrete_gray', 'concrete_light_blue', 'concrete_magenta'
-- Terracotta colors: 'terracotta_white', 'terracotta_black', 'terracotta_red', 'terracotta_orange', 'terracotta_yellow', 'terracotta_green', 'terracotta_blue', 'terracotta_purple', 'terracotta_pink', 'terracotta_cyan', 'terracotta_brown', 'terracotta_lime', 'terracotta_gray', 'terracotta_light_blue', 'terracotta_magenta'
-- Decorative: 'linen_red', 'linen_blue', 'box_red', 'box_blue', 'box_lime', 'glazed_terracotta_cyan', 'glazed_terracotta_purple', 'shulker_box'
-- Special: 'tnt', 'glowstone', 'sea_lantern', 'magma', 'netherrack', 'soul_sand', 'nether_brick'
+Available materials (ONLY use these exact names with the materials dictionary):
+${MATERIAL_LIST}
 
 CRITICAL: DO NOT use materials that are not in this list (e.g., NO 'steel', 'silver', 'bronze', etc.). Use 'iron' for metallic structures.
 
@@ -181,12 +186,18 @@ Generate ONLY the Python code, no explanations or markdown formatting.`;
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'Failed to generate code');
+      const error = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        throw new Error(error.error?.message || 'The AI key was not accepted. Sign in at teachingtools.dev again, or check your own key.');
+      }
+      if (response.status === 429) {
+        throw new Error('The AI is busy or out of credit right now. Wait a minute and try again.');
+      }
+      throw new Error(error.error?.message || error.message || `Failed to generate code (${response.status})`);
     }
 
     const data = await response.json();
-    const generatedCode = data.choices[0]?.message?.content?.trim();
+    const generatedCode = extractCode(data.choices?.[0]?.message?.content || '');
 
     if (!generatedCode) {
       throw new Error('No code generated');
@@ -194,42 +205,12 @@ Generate ONLY the Python code, no explanations or markdown formatting.`;
 
     return generatedCode;
   } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("Can't reach the AI service. Check the internet connection and try again.");
+    }
     if (error instanceof Error) {
-      throw new Error(`OpenAI API Error: ${error.message}`);
+      throw error;
     }
     throw new Error('Failed to generate code');
-  }
-}
-
-export async function transcribeSpeech(audioBlob: Blob, apiKey: string): Promise<string> {
-  if (!apiKey) {
-    throw new Error('OpenAI API key is required');
-  }
-
-  const formData = new FormData();
-  formData.append('file', audioBlob, 'audio.webm');
-  formData.append('model', 'whisper-1');
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: formData
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'Failed to transcribe audio');
-    }
-
-    const data = await response.json();
-    return data.text;
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`OpenAI API Error: ${error.message}`);
-    }
-    throw new Error('Failed to transcribe audio');
   }
 }

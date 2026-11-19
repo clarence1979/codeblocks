@@ -19,7 +19,7 @@ export function PrivacyModal({ onClose }: PrivacyModalProps) {
         </div>
 
         <div className="px-6 py-6 text-gray-300 space-y-6">
-          <p className="text-sm text-gray-400">Last Updated: October 2025</p>
+          <p className="text-sm text-gray-400">Last Updated: November 2026</p>
 
           <section>
             <h3 className="text-xl font-semibold text-white mb-3">1. Information We Collect</h3>
@@ -28,14 +28,16 @@ export function PrivacyModal({ onClose }: PrivacyModalProps) {
               <li>Does not collect, store, or transmit any personal information</li>
               <li>Does not require user accounts or registration</li>
               <li>Does not use cookies for tracking purposes</li>
-              <li>Runs entirely in your web browser</li>
+              <li>Runs in your web browser, including Python, which is built into the page</li>
               <li>Does not store any code you write on external servers</li>
+              <li>Only sends anything over the internet when you use the optional AI Input (see below)</li>
             </ul>
           </section>
 
           <section>
             <h3 className="text-xl font-semibold text-white mb-3">2. How We Use Information</h3>
             <p>All code you write and 3D worlds you create remain local to your browser session. No data is sent to external servers for storage or analysis.</p>
+            <p className="mt-3"><strong>AI Input (optional):</strong> when you press Generate Code, the description you typed or spoke is sent to OpenAI so it can write Python for you. If you opened Code Blocks from teachingtools.dev, the request goes through the teachingtools.dev service using your school's AI access. Otherwise it goes straight to OpenAI using an API key you enter. Your own key is checked with OpenAI, kept only in this browser's storage, never shown on screen, and removed when you press "Forget my key". Speech input uses your browser's built-in speech recognition, which may be processed by your browser's maker.</p>
           </section>
 
           <section>
@@ -43,6 +45,7 @@ export function PrivacyModal({ onClose }: PrivacyModalProps) {
             <p className="mb-3">This application uses:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li><strong>Pyodide:</strong> A Python runtime that executes entirely in your browser</li>
+              <li><strong>OpenAI:</strong> Only when you use the AI Input (directly, or through teachingtools.dev)</li>
               <li><strong>PayPal:</strong> For optional donations (only if you choose to donate)</li>
             </ul>
             <p className="mt-3">No analytics, tracking, or advertising services are used.</p>
@@ -50,7 +53,7 @@ export function PrivacyModal({ onClose }: PrivacyModalProps) {
 
           <section>
             <h3 className="text-xl font-semibold text-white mb-3">4. Data Security</h3>
-            <p>Since no personal data is collected or stored, there is no risk of data breaches related to personal information. All code execution happens locally in your browser.</p>
+            <p>No personal data is collected or stored by Code Blocks. All code execution happens locally in your browser. Remind students not to type personal information into the AI Input.</p>
           </section>
 
           <section>

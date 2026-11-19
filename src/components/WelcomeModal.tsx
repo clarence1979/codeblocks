@@ -57,9 +57,9 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             <ol className="list-decimal list-inside space-y-1 text-sm text-gray-300">
               <li>Start with Lesson 1 to learn the basics</li>
               <li>Click "Run Code" to execute your Python program</li>
-              <li>Watch blocks appear in the 3D world</li>
+              <li>Watch blocks appear in the 3D world (press Stop at any time)</li>
               <li>Experiment and modify the code to learn</li>
-              <li>Progress through 20 interactive lessons</li>
+              <li>Progress through 21 interactive lessons</li>
             </ol>
           </div>
 

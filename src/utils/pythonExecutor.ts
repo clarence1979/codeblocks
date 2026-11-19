@@ -1,185 +1,187 @@
-import { loadPyodide, PyodideInterface } from 'pyodide';
+import PythonWorker from '../workers/python.worker.ts?worker&inline';
 import { MATERIALS } from '../data/materials';
 
-let pyodideInstance: PyodideInterface | null = null;
+/*
+ * Starts Python (Pyodide) in a background worker and runs student code there.
+ * When the page was built as one standalone file, Python is stored inside the page as
+ * compressed text; it is unpacked once and reused, so Code Blocks works offline.
+ */
 
-export async function initializePyodide(): Promise<PyodideInterface> {
-  if (pyodideInstance) {
-    return pyodideInstance;
-  }
+export type PythonStatus = 'loading' | 'ready' | 'error';
 
-  pyodideInstance = await loadPyodide({
-    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.29.0/full/'
-  });
+type Assets = { asmJs: Blob; wasm: Blob; stdlib: Blob; lock: Blob };
 
-  return pyodideInstance;
+let status: PythonStatus = 'loading';
+let statusMessage = 'Loading Python…';
+const statusListeners = new Set<() => void>();
+
+function setStatus(next: PythonStatus, message: string) {
+  status = next;
+  statusMessage = message;
+  statusListeners.forEach((l) => l());
 }
 
-export async function executePythonCode(
-  code: string,
-  onBlockPlaced: (x: number, y: number, z: number, material: number) => void,
-  onConsoleOutput: (message: string) => void,
-  onConsoleClear: () => void,
-  isPositionOccupied?: (x: number, y: number, z: number) => boolean,
-  offset?: { x: number; y: number; z: number }
-): Promise<void> {
-  try {
-    const pyodide = await initializePyodide();
-
-    // Track blocks placed during this execution for immediate collision detection
-    const placedBlocksThisExecution = new Set<string>();
-
-    // Wrapper for block placement that tracks placements
-    const trackingBlockCallback = (x: number, y: number, z: number, material: number) => {
-      const key = `${x},${y},${z}`;
-      placedBlocksThisExecution.add(key);
-      onBlockPlaced(x, y, z, material);
+export const pythonStatus = {
+  get: () => status,
+  message: () => statusMessage,
+  subscribe(fn: () => void) {
+    statusListeners.add(fn);
+    return () => {
+      statusListeners.delete(fn);
     };
+  },
+};
 
-    // Enhanced position check that includes currently-being-placed blocks
-    const enhancedPositionCheck = (x: number, y: number, z: number): boolean => {
-      const key = `${x},${y},${z}`;
-      // Check if block was just placed in this execution
-      if (placedBlocksThisExecution.has(key)) {
-        return true;
-      }
-      // Check existing blocks in store
-      if (isPositionOccupied) {
-        return isPositionOccupied(x, y, z);
-      }
-      return false;
-    };
+let assetsPromise: Promise<Assets | null> | null = null;
 
-    const offsetX = offset?.x || 0;
-    const offsetY = offset?.y || 0;
-    const offsetZ = offset?.z || 0;
+async function unpack(id: string): Promise<Blob | null> {
+  const el = document.getElementById(id);
+  if (!el || !el.textContent) return null;
+  const base64 = el.textContent.trim();
+  el.textContent = '';
+  const packed = await (await fetch(`data:application/octet-stream;base64,${base64}`)).blob();
+  const stream = packed.stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Response(stream).blob();
+}
 
-    const codeCraftModule = `
-import sys
-from types import ModuleType
-
-# Global callbacks that all Game instances will use
-_global_block_callback = None
-_global_console_callback = None
-_global_clear_callback = None
-_global_position_check_callback = None
-_global_offset = (${offsetX}, ${offsetY}, ${offsetZ})
-
-class Position:
-    def __init__(self, x, y, z):
-        self.x = x + _global_offset[0]
-        self.y = y + _global_offset[1]
-        self.z = z + _global_offset[2]
-
-    def __repr__(self):
-        return f"Position(x={self.x}, y={self.y}, z={self.z})"
-
-class Game:
-    def __init__(self):
-        self.materials = ${JSON.stringify(MATERIALS)}
-        # Use global callbacks so all Game instances work
-        self._block_callback = _global_block_callback
-        self._console_callback = _global_console_callback
-        self._clear_callback = _global_clear_callback
-        self._position_check_callback = _global_position_check_callback
-        self.collision_detection_enabled = True
-
-    def set_block(self, position, material):
-        # Check for collision before placing
-        if self.collision_detection_enabled and self._position_check_callback:
-            if self._position_check_callback(position.x, position.y, position.z):
-                # Position is occupied, don't place block
-                return False
-
-        if self._block_callback:
-            self._block_callback(position.x, position.y, position.z, material)
-            return True
-        return False
-
-    def is_position_occupied(self, position):
-        """Check if a position is already occupied by a block"""
-        if self._position_check_callback:
-            return self._position_check_callback(position.x, position.y, position.z)
-        return False
-
-    def can_place_block(self, position):
-        """Check if a block can be placed at this position (opposite of is_position_occupied)"""
-        return not self.is_position_occupied(position)
-
-    def disable_collision_detection(self):
-        """Disable collision detection to allow overwriting blocks"""
-        self.collision_detection_enabled = False
-
-    def enable_collision_detection(self):
-        """Enable collision detection to prevent overwriting blocks"""
-        self.collision_detection_enabled = True
-
-    def clear_console(self):
-        if self._clear_callback:
-            self._clear_callback()
-
-def _set_global_callbacks(block_cb, console_cb, clear_cb, position_check_cb):
-    global _global_block_callback, _global_console_callback, _global_clear_callback, _global_position_check_callback
-    _global_block_callback = block_cb
-    _global_console_callback = console_cb
-    _global_clear_callback = clear_cb
-    _global_position_check_callback = position_check_cb
-
-# Create codeblocks module
-codeblocks = ModuleType('codeblocks')
-codeblocks.Position = Position
-codeblocks.Game = Game
-
-# Register the module
-sys.modules['codeblocks'] = codeblocks
-
-# Also register as codecraft for backwards compatibility
-sys.modules['codecraft'] = codeblocks
-`;
-
-    await pyodide.runPythonAsync(codeCraftModule);
-
-    pyodide.globals.set('js_block_callback', trackingBlockCallback);
-    pyodide.globals.set('js_console_callback', onConsoleOutput);
-    pyodide.globals.set('js_clear_callback', onConsoleClear);
-    pyodide.globals.set('js_position_check_callback', enhancedPositionCheck);
-
-    const setupCallbacks = `
-_set_global_callbacks(js_block_callback, js_console_callback, js_clear_callback, js_position_check_callback)
-`;
-    await pyodide.runPythonAsync(setupCallbacks);
-
-    const wrappedCode = `
-import sys
-import io
-import traceback
-
-output_buffer = io.StringIO()
-sys.stdout = output_buffer
-sys.stderr = output_buffer
-
-try:
-${code.split('\n').map(line => '    ' + line).join('\n')}
-except Exception as e:
-    print(f"Error: {e}", file=sys.stderr)
-    traceback.print_exc()
-
-output = output_buffer.getvalue()
-output
-`;
-
-    const output = await pyodide.runPythonAsync(wrappedCode);
-
-    if (output && typeof output === 'string') {
-      const lines = output.split('\n').filter(line => line.trim());
-      lines.forEach(line => onConsoleOutput(line));
-    }
-
-  } catch (error) {
-    if (error instanceof Error) {
-      onConsoleOutput(`Error: ${error.message}`);
-    } else {
-      onConsoleOutput('An unknown error occurred');
-    }
+function embeddedAssets(): Promise<Assets | null> {
+  if (!assetsPromise) {
+    assetsPromise = (async () => {
+      if (!document.getElementById('py-asm-js')) return null;
+      const [asmJs, wasm, stdlib, lock] = await Promise.all([
+        unpack('py-asm-js'),
+        unpack('py-asm-wasm'),
+        unpack('py-stdlib'),
+        unpack('py-lock'),
+      ]);
+      if (!asmJs || !wasm || !stdlib || !lock) return null;
+      return { asmJs, wasm, stdlib, lock };
+    })();
   }
+  return assetsPromise;
+}
+
+let worker: Worker | null = null;
+let workerReady: Promise<Worker> | null = null;
+// Bumped when a worker is thrown away, so a start that was still loading doesn't come back to life.
+let generation = 0;
+
+interface RunHandlers {
+  onBlocks: (packed: Int32Array) => void;
+  onLines: (lines: string[]) => void;
+  onClear: () => void;
+}
+
+interface ActiveRun {
+  id: number;
+  handlers: RunHandlers;
+  resolve: (result: RunResult) => void;
+}
+
+export interface RunResult {
+  ok: boolean;
+  stopped: boolean;
+}
+
+let activeRun: ActiveRun | null = null;
+let nextRunId = 1;
+
+function startWorker(): Promise<Worker> {
+  if (workerReady) return workerReady;
+  setStatus('loading', 'Loading Python…');
+  const gen = generation;
+  workerReady = (async () => {
+    const assets = await embeddedAssets();
+    if (gen !== generation) return new Promise<Worker>(() => undefined);
+    const w = new PythonWorker();
+    worker = w;
+    await new Promise<void>((resolve, reject) => {
+      w.onmessage = (event: MessageEvent) => {
+        const msg = event.data;
+        if (msg.type === 'ready') resolve();
+        else if (msg.type === 'init-error') reject(new Error(msg.message));
+      };
+      w.onerror = (e) => reject(new Error(e.message || 'Python could not start'));
+      w.postMessage({ type: 'init', assets, materials: MATERIALS });
+    });
+    w.onmessage = handleMessage;
+    w.onerror = null;
+    setStatus('ready', 'Python ready');
+    return w;
+  })();
+  workerReady.catch((err: Error) => {
+    if (gen !== generation) return;
+    worker?.terminate();
+    worker = null;
+    workerReady = null;
+    setStatus('error', `Python could not start: ${err.message}`);
+  });
+  return workerReady;
+}
+
+function handleMessage(event: MessageEvent) {
+  const msg = event.data;
+  const run = activeRun;
+  if (!run || msg.id !== run.id) return;
+  switch (msg.type) {
+    case 'blocks':
+      run.handlers.onBlocks(msg.data as Int32Array);
+      break;
+    case 'lines':
+      run.handlers.onLines(msg.lines as string[]);
+      break;
+    case 'clear':
+      run.handlers.onClear();
+      break;
+    case 'done':
+      activeRun = null;
+      run.resolve({ ok: !!msg.ok, stopped: false });
+      break;
+  }
+}
+
+/** Begin loading Python in the background so the first Run is quick. */
+export function preloadPython() {
+  void startWorker().catch(() => undefined);
+}
+
+export function runPython(
+  code: string,
+  world: Int32Array,
+  offset: { x: number; y: number; z: number },
+  handlers: RunHandlers
+): Promise<RunResult> {
+  if (activeRun) return Promise.reject(new Error('Code is already running.'));
+  const id = nextRunId++;
+  return new Promise<RunResult>((resolve) => {
+    activeRun = { id, handlers, resolve };
+    startWorker().then(
+      (w) => {
+        if (activeRun?.id !== id) return; // stopped while Python was loading
+        w.postMessage({ type: 'run', id, code, offset: [offset.x, offset.y, offset.z], world }, [world.buffer]);
+      },
+      (err: Error) => {
+        if (activeRun?.id !== id) return;
+        activeRun = null;
+        handlers.onLines(['\u0001Error: Python could not start (' + err.message + '). Reload the page and try again.']);
+        resolve({ ok: false, stopped: false });
+      }
+    );
+  });
+}
+
+/** Stop the running program at once. Python restarts in the background for the next run. */
+export function stopPython() {
+  const run = activeRun;
+  activeRun = null;
+  generation++;
+  worker?.terminate();
+  worker = null;
+  workerReady = null;
+  if (run) run.resolve({ ok: false, stopped: true });
+  preloadPython();
+}
+
+export function isPythonRunning() {
+  return activeRun !== null;
 }
